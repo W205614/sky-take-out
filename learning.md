@@ -61,7 +61,9 @@
 
 # 2.新增员工
 
-## 2.1.表结构设计
+## 2.1.需求分析和设计
+
+### 2.1.1.表结构设计
 
 ```sql
 CREATE TABLE `employee` (
@@ -76,6 +78,26 @@ CREATE TABLE `employee` (
   `create_time` datetime DEFAULT NULL COMMENT '创建时间',
 ```
 
+### 2.1.2.参数传递
+
+application/json
+
+{    
+
+​	"id": 0,
+
+​	"idNumber": "string",    
+
+​	"name": "string",
+
+​    "phone": "string", 
+
+   "sex": "string",
+
+​    "username": "string" 
+
+}
+
 ## 2.2.代码开发
 
 注意:
@@ -84,7 +106,63 @@ CREATE TABLE `employee` (
 
 ​	2.DTO方便封装前端传送的数据,但是对于持久层的数据传递建议使用实体类
 
-### 2.2.1.EmployeeController
+### 2.2.1.EmployeeDTO
+
+```java
+public class EmployeeDTO implements Serializable {
+
+    private Long id;
+
+    private String username;
+
+    private String name;
+
+    private String phone;
+
+    private String sex;
+
+    private String idNumber;
+
+}
+```
+
+### 2.2.2.Employee
+
+```java
+public class Employee implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    private Long id;
+
+    private String username;
+
+    private String name;
+
+    private String password;
+
+    private String phone;
+
+    private String sex;
+
+    private String idNumber;
+
+    private Integer status;
+
+    //@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime createTime;
+
+    //@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime updateTime;
+
+    private Long createUser;
+
+    private Long updateUser;
+
+}
+```
+
+### 2.2.3.EmployeeController
 
 ```java
 /**
@@ -102,7 +180,7 @@ public Result save(@RequestBody EmployeeDTO employeeDTO) {
 }
 ```
 
-### 2.2.2.EmployeeServiceImpl
+### 2.2.4.EmployeeServiceImpl
 
 ```java
 /**
@@ -135,7 +213,7 @@ public void save(EmployeeDTO employeeDTO) {
 }
 ```
 
-### 2.2.3.EmployeeMapper
+### 2.2.5.EmployeeMapper
 
 ```java
 /**
@@ -148,7 +226,7 @@ public void save(EmployeeDTO employeeDTO) {
 void insert(Employee employee);
 ```
 
-### 2.2.4.处理已存在账户异常
+### 2.2.6.处理已存在账户异常
 
 ```java
 /**
@@ -222,4 +300,250 @@ try {
 // 记录当前记录创建人id和修改人id
 employee.setCreateUser(BaseContext.getCurrentId());
 employee.setUpdateUser(BaseContext.getCurrentId());
+```
+
+# 3.员工分页查询
+
+## 3.1.需求分析和设计
+
+业务规则:
+
+​	1.根据页码展示员工信息
+
+​	2.每页展示10条数据
+
+​	3.分页查询时可以根据需要,输入员工姓名进行查询
+
+Query 参数:name, page, pageSize
+
+## 3.2.代码开发
+
+### 3.2.1.EmployeePageQueryDTO
+
+```java
+public class EmployeePageQueryDTO implements Serializable {
+
+    //员工姓名
+    private String name;
+
+    //页码
+    private int page;
+
+    //每页显示记录数
+    private int pageSize;
+
+}
+```
+
+### 3.2.2.PageResult
+
+```java
+public class PageResult implements Serializable {
+
+    private long total; //总记录数
+
+    private List records; //当前页数据集合
+
+}
+```
+
+### 3.2.3.EmployeeController
+
+```java
+/**
+ * 员工分页查询
+ * @param employeePageQueryDTO
+ * @return
+ */
+@GetMapping("/page")
+@ApiOperation("员工分页查询")
+public Result<PageResult> page(EmployeePageQueryDTO employeePageQueryDTO) {
+    log.info("员工分页查询, 参数为: {}", employeePageQueryDTO);
+    PageResult pageResult = employeeService.pageQuery(employeePageQueryDTO);
+    return Result.success(pageResult);
+}
+```
+
+### 3.2.4.EmployeeServiceImpl
+
+```java
+/**
+ * 员工分页查询
+ * @param employeePageQueryDTO
+ * @return
+ */
+@Override
+public PageResult pageQuery(EmployeePageQueryDTO employeePageQueryDTO) {
+    PageHelper.startPage(employeePageQueryDTO.getPage(), employeePageQueryDTO.getPageSize());
+
+    Page<Employee> page = employeeMapper.pageQuery(employeePageQueryDTO);
+    long total = page.getTotal();
+    List<Employee> records = page.getResult();
+
+    return new PageResult(total, records);
+}
+```
+
+### 3.2.5.EmployeeMapper
+
+```java
+/**
+ * 分页查询
+ * @param employeePageQueryDTO
+ * @return
+ */
+Page<Employee> pageQuery(EmployeePageQueryDTO employeePageQueryDTO);
+```
+
+### 3.2.6.EmployeeMapper.xml
+
+```java
+<select id="pageQuery" resultType="com.sky.entity.Employee">
+    select * from employee
+    <where>
+        <if test="name != null and name != ''">
+            and name like concat('%', #{name}, '%')
+        </if>
+    </where>
+    order by create_time desc
+</select>
+```
+
+## 3.3.开发过程问题解决
+
+### 3.3.1.如何处理日期的表示
+
+通过扩展 Spring MVC 框架的消息转换器
+
+```java
+/**
+ * 扩展 Spring MVC 框架的消息转换器
+ * @param converters
+ */
+protected void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
+    log.info("扩展消息转换器...");
+    //创建消息转换器对象
+    MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter();
+    //设置对象转换器，底层使用Jackson将Java对象转为json
+    converter.setObjectMapper(new JacksonObjectMapper());
+    //将上面的消息转换器对象追加到mvc框架的转换器集合中
+    converters.add(0, converter);
+}
+```
+
+```java
+/**
+ * 对象映射器:基于jackson将Java对象转为json，或者将json转为Java对象
+ * 将JSON解析为Java对象的过程称为 [从JSON反序列化Java对象]
+ * 从Java对象生成JSON的过程称为 [序列化Java对象到JSON]
+ */
+public class JacksonObjectMapper extends ObjectMapper {
+
+    public static final String DEFAULT_DATE_FORMAT = "yyyy-MM-dd";
+    //public static final String DEFAULT_DATE_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
+    public static final String DEFAULT_DATE_TIME_FORMAT = "yyyy-MM-dd HH:mm";
+    public static final String DEFAULT_TIME_FORMAT = "HH:mm:ss";
+
+    public JacksonObjectMapper() {
+        super();
+        //收到未知属性时不报异常
+        this.configure(FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+        //反序列化时，属性不存在的兼容处理
+        this.getDeserializationConfig().withoutFeatures(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+        SimpleModule simpleModule = new SimpleModule()
+                .addDeserializer(LocalDateTime.class, new LocalDateTimeDeserializer(DateTimeFormatter.ofPattern(DEFAULT_DATE_TIME_FORMAT)))
+                .addDeserializer(LocalDate.class, new LocalDateDeserializer(DateTimeFormatter.ofPattern(DEFAULT_DATE_FORMAT)))
+                .addDeserializer(LocalTime.class, new LocalTimeDeserializer(DateTimeFormatter.ofPattern(DEFAULT_TIME_FORMAT)))
+                .addSerializer(LocalDateTime.class, new LocalDateTimeSerializer(DateTimeFormatter.ofPattern(DEFAULT_DATE_TIME_FORMAT)))
+                .addSerializer(LocalDate.class, new LocalDateSerializer(DateTimeFormatter.ofPattern(DEFAULT_DATE_FORMAT)))
+                .addSerializer(LocalTime.class, new LocalTimeSerializer(DateTimeFormatter.ofPattern(DEFAULT_TIME_FORMAT)));
+
+        //注册功能模块 例如，可以添加自定义序列化器和反序列化器
+        this.registerModule(simpleModule);
+    }
+}
+```
+
+# 4.启用禁用员工账号
+
+## 4.1.需求分析和设计
+
+业务规则:
+
+​	1.可以对状态为"启用"的员工账号进行"禁用"操作
+
+​	2.可以对状态为"禁用"的员工账号进行"启用"操作
+
+​	3.状态为"禁用"的员工账号不能登陆系统
+
+Query 参数:id
+
+## 4.2.代码开发
+
+### 4.2.1.EmployeeController
+
+```java
+/**
+ * 启用禁用员工账号
+ * @param status
+ * @param id
+ * @return
+ */
+@PostMapping("/status/{status}")
+@ApiOperation("启用禁用员工账号")
+public Result startOrStop(@PathVariable Integer status, Long id) {
+    log.info("启用禁用员工账号: {}, {}", status, id);
+    employeeService.startOrStop(status, id);
+    return Result.success();
+}
+```
+
+### 4.2.2.EmployeeServiceImpl
+
+```java
+/**
+ * 启用禁用员工账号
+ * @param status
+ * @param id
+ */
+@Override
+public void startOrStop(Integer status, Long id) {
+    Employee employee = Employee.builder()
+            .status(status)
+            .id(id)
+            .build();
+    employeeMapper.update(employee);
+}
+```
+
+### 4.2.3.EmployeeMapper
+
+```java
+/**
+ * 启用禁用员工账号
+ * @param employee
+ */
+void update(Employee employee);
+```
+
+### 4.2.4.EmployeeMapper.xml
+
+```java
+<update id="update" parameterType="Employee">
+    update employee
+    <set>
+        <if test="name != null">name = #{name},</if>
+        <if test="username != null">username = #{username},</if>
+        <if test="password != null">password = #{password},</if>
+        <if test="phone != null">phone = #{phone},</if>
+        <if test="sex != null">sex = #{sex},</if>
+        <if test="idNumber != null">id_number = #{idNumber},</if>
+        <if test="updateTime != null">update_time = #{updateTime},</if>
+        <if test="updateUser != null">update_user = #{updateUser},</if>
+        <if test="status != null">status = #{status},</if>
+    </set>
+    where id = #{id}
+</update>
 ```
