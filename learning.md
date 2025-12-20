@@ -1,8 +1,8 @@
 **苍穹外卖**
 
-# 1.项目概述
+# 一.项目概述
 
-## 1.1.项目结构
+## 1.项目结构
 
 | **序号** | **名称**     | **说明**                                                     |
 | -------- | ------------ | ------------------------------------------------------------ |
@@ -24,13 +24,13 @@
 
 3.sky-server 子模块中存放的是 配置文件、配置类、拦截器、controller、service、mapper、启动类等
 
-## 1.2.功能架构
+## 2.功能架构
 
 管理端:员工管理,  分类管理,  菜品管理,  套餐管理,  订单管理,  工作台,  数据统计,  来单提醒
 
 用户端:微信登录,  商品浏览,  购物车,  用户下单,  微信支付,  历史订单,  地址管理,  用户催单
 
-## 1.3.技术选型
+## 3.技术选型
 
 用户层:node.js,  VUE.js,  ElementUI,  微信小程序,  apache echarts
 
@@ -42,15 +42,15 @@
 
 工具:Git,  maven,  Junit,  postman
 
-## 1.4.问题
+## 4.问题
 
-### 1.4.1.通过Swagger就可以生成接口文档, 那么我们是否就不需要Yapi, Apifox等工具?
+### 4.1.通过Swagger就可以生成接口文档, 那么我们是否就不需要Yapi, Apifox等工具?
 
 1.Yapi, Apifox等是在设计阶段使用的工具, 管理和维护接口
 
 2.Swagger在开发阶段使用的框架, 帮助后端开发人员做后端的接口测试
 
-### 1.4.2.Swagger常用注解
+### 4.2.Swagger常用注解
 
 | **注解**          | **说明**                                               |
 | ----------------- | ------------------------------------------------------ |
@@ -59,11 +59,11 @@
 | @ApiModelProperty | 用在属性上，描述属性信息                               |
 | @ApiOperation     | 用在方法上，例如Controller的方法，说明方法的用途、作用 |
 
-# 2.新增员工
+# 二.员工管理
 
-## 2.1.需求分析和设计
+## 1.新增员工
 
-### 2.1.1.表结构设计
+### 1.1.需求分析和设计
 
 ```sql
 CREATE TABLE `employee` (
@@ -77,8 +77,6 @@ CREATE TABLE `employee` (
   `status` int NOT NULL DEFAULT '1' COMMENT '状态 0:禁用，1:启用',
   `create_time` datetime DEFAULT NULL COMMENT '创建时间',
 ```
-
-### 2.1.2.参数传递
 
 application/json
 
@@ -98,7 +96,7 @@ application/json
 
 }
 
-## 2.2.代码开发
+### 1.2.代码开发
 
 注意:
 
@@ -106,7 +104,7 @@ application/json
 
 ​	2.DTO方便封装前端传送的数据,但是对于持久层的数据传递建议使用实体类
 
-### 2.2.1.EmployeeDTO
+#### 1.2.1.EmployeeDTO
 
 ```java
 public class EmployeeDTO implements Serializable {
@@ -126,7 +124,7 @@ public class EmployeeDTO implements Serializable {
 }
 ```
 
-### 2.2.2.Employee
+#### 1.2.2.Employee
 
 ```java
 public class Employee implements Serializable {
@@ -162,7 +160,7 @@ public class Employee implements Serializable {
 }
 ```
 
-### 2.2.3.EmployeeController
+#### 1.2.3.EmployeeController
 
 ```java
 /**
@@ -180,7 +178,7 @@ public Result save(@RequestBody EmployeeDTO employeeDTO) {
 }
 ```
 
-### 2.2.4.EmployeeServiceImpl
+#### 1.2.4.EmployeeServiceImpl
 
 ```java
 /**
@@ -213,7 +211,7 @@ public void save(EmployeeDTO employeeDTO) {
 }
 ```
 
-### 2.2.5.EmployeeMapper
+#### 1.2.5.EmployeeMapper
 
 ```java
 /**
@@ -226,7 +224,7 @@ public void save(EmployeeDTO employeeDTO) {
 void insert(Employee employee);
 ```
 
-### 2.2.6.处理已存在账户异常
+#### 1.2.6.处理已存在账户异常
 
 ```java
 /**
@@ -249,9 +247,9 @@ public Result exceptionHandler(SQLIntegrityConstraintViolationException ex) {
 }
 ```
 
-## 2.3.开发过程中关键问题
+### 1.3.开发过程中关键问题
 
-### 2.3.1.如何获取的操作人id
+#### 1.3.1.如何获取的操作人id
 
 每一次的运行ThreadLocal都会创建一个新的线程,线程id是共享的,通过BaseContext来获取对应的id
 
@@ -302,9 +300,9 @@ employee.setCreateUser(BaseContext.getCurrentId());
 employee.setUpdateUser(BaseContext.getCurrentId());
 ```
 
-# 3.员工分页查询
+## 2.员工分页查询
 
-## 3.1.需求分析和设计
+### 2.1.需求分析和设计
 
 业务规则:
 
@@ -316,9 +314,9 @@ employee.setUpdateUser(BaseContext.getCurrentId());
 
 Query 参数:name, page, pageSize
 
-## 3.2.代码开发
+### 2.2.代码开发
 
-### 3.2.1.EmployeePageQueryDTO
+#### 2.2.1.EmployeePageQueryDTO
 
 ```java
 public class EmployeePageQueryDTO implements Serializable {
@@ -335,7 +333,7 @@ public class EmployeePageQueryDTO implements Serializable {
 }
 ```
 
-### 3.2.2.PageResult
+#### 2.2.2.PageResult
 
 ```java
 public class PageResult implements Serializable {
@@ -347,7 +345,7 @@ public class PageResult implements Serializable {
 }
 ```
 
-### 3.2.3.EmployeeController
+#### 2.2.3.EmployeeController
 
 ```java
 /**
@@ -364,7 +362,7 @@ public Result<PageResult> page(EmployeePageQueryDTO employeePageQueryDTO) {
 }
 ```
 
-### 3.2.4.EmployeeServiceImpl
+#### 2.2.4.EmployeeServiceImpl
 
 ```java
 /**
@@ -384,7 +382,7 @@ public PageResult pageQuery(EmployeePageQueryDTO employeePageQueryDTO) {
 }
 ```
 
-### 3.2.5.EmployeeMapper
+#### 2.2.5.EmployeeMapper
 
 ```java
 /**
@@ -395,7 +393,7 @@ public PageResult pageQuery(EmployeePageQueryDTO employeePageQueryDTO) {
 Page<Employee> pageQuery(EmployeePageQueryDTO employeePageQueryDTO);
 ```
 
-### 3.2.6.EmployeeMapper.xml
+#### 2.2.6.EmployeeMapper.xml
 
 ```java
 <select id="pageQuery" resultType="com.sky.entity.Employee">
@@ -409,9 +407,9 @@ Page<Employee> pageQuery(EmployeePageQueryDTO employeePageQueryDTO);
 </select>
 ```
 
-## 3.3.开发过程问题解决
+### 2.3.开发过程问题解决
 
-### 3.3.1.如何处理日期的表示
+#### 2.3.1.如何处理日期的表示
 
 通过扩展 Spring MVC 框架的消息转换器
 
@@ -466,9 +464,9 @@ public class JacksonObjectMapper extends ObjectMapper {
 }
 ```
 
-# 4.启用禁用员工账号
+## 3.启用禁用员工账号
 
-## 4.1.需求分析和设计
+### 3.1.需求分析和设计
 
 业务规则:
 
@@ -478,11 +476,19 @@ public class JacksonObjectMapper extends ObjectMapper {
 
 ​	3.状态为"禁用"的员工账号不能登陆系统
 
-Query 参数:id
+请求参数
 
-## 4.2.代码开发
+​	1.Path 参数
 
-### 4.2.1.EmployeeController
+​		status string  状态，1为启用 0为禁用
+
+​	2.Query 参数
+
+​		id
+
+### 3.2.代码开发
+
+#### 3.2.1.EmployeeController
 
 ```java
 /**
@@ -500,7 +506,7 @@ public Result startOrStop(@PathVariable Integer status, Long id) {
 }
 ```
 
-### 4.2.2.EmployeeServiceImpl
+#### 3.2.2.EmployeeServiceImpl
 
 ```java
 /**
@@ -518,7 +524,7 @@ public void startOrStop(Integer status, Long id) {
 }
 ```
 
-### 4.2.3.EmployeeMapper
+#### 3.2.3.EmployeeMapper
 
 ```java
 /**
@@ -528,7 +534,7 @@ public void startOrStop(Integer status, Long id) {
 void update(Employee employee);
 ```
 
-### 4.2.4.EmployeeMapper.xml
+#### 3.2.4.EmployeeMapper.xml
 
 ```java
 <update id="update" parameterType="Employee">
@@ -547,3 +553,657 @@ void update(Employee employee);
     where id = #{id}
 </update>
 ```
+
+## 4.编辑员工
+
+### 4.1.需求分析和设计
+
+#### 4.1.1.根据id查询员工信息
+
+请求参数: Path 参数
+
+​	id string  员工id
+
+#### 4.1.2.编辑员工信息
+
+application/json
+
+{    
+
+​	"id": 0, 
+
+   "idNumber": "string",
+
+​    "name": "string", 
+
+   "phone": "string", 
+
+   "sex": "string",
+
+​    "username": "string"
+
+ }
+
+### 4.2.代码开发
+
+#### 4.2.1.EmployeeController
+
+```java
+/**
+ * 根据id查询员工信息
+ * @param id
+ * @return
+ */
+@GetMapping("/{id}")
+@ApiOperation("根据id查询员工信息")
+public Result<Employee> getById(@PathVariable Long id) {
+    Employee employee = employeeService.getById(id);
+    return Result.success(employee);
+}
+
+/**
+ * 编辑员工信息
+ * @param employeeDTO
+ * @return
+ */
+@PutMapping
+@ApiOperation("编辑员工信息")
+public Result update(@RequestBody EmployeeDTO employeeDTO) {
+    log.info("编辑员工信息: {}", employeeDTO);
+    employeeService.update(employeeDTO);
+    return Result.success();
+}
+```
+
+#### 4.2.2.EmployeeServiceImpl
+
+```java
+/**
+ * 根据id查询员工信息
+ * @param id
+ * @return
+ */
+@Override
+public Employee getById(Long id) {
+    Employee employee = employeeMapper.getById(id);
+    employee.setPassword("****");
+    return employee;
+}
+
+/**
+ * 编辑员工信息
+ * @param employeeDTO
+ */
+@Override
+public void update(EmployeeDTO employeeDTO) {
+    Employee employee = new Employee();
+    BeanUtils.copyProperties(employeeDTO, employee);
+
+    employee.setUpdateTime(LocalDateTime.now());
+    employee.setUpdateUser(BaseContext.getCurrentId());
+
+    employeeMapper.update(employee);
+}
+```
+
+#### 4.2.3.EmployeeMapper
+
+```java
+/**
+ * 根据id查询员工信息
+ * @param id
+ * @return
+ */
+@Select("select * from employee where id = #{id}")
+Employee getById(Long id);
+```
+
+# 三.分类管理
+
+## 1.需求分析和设计
+
+业务规则:
+
+​	1.分类名称必须是唯一的
+
+​	2.分类按照类型可以分为菜品分类和套餐分类
+
+​	3.新添加的分类状态为默认为"禁用"
+
+```sql
+CREATE TABLE `category` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `type` int DEFAULT NULL COMMENT '类型   1 菜品分类 2 套餐分类',
+  `name` varchar(32) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin NOT NULL COMMENT '分类名称',
+  `sort` int NOT NULL DEFAULT '0' COMMENT '顺序',
+  `status` int DEFAULT NULL COMMENT '分类状态 0:禁用，1:启用',
+  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
+  `create_user` bigint DEFAULT NULL COMMENT '创建人',
+  `update_user` bigint DEFAULT NULL COMMENT '修改人',
+```
+
+## 2.代码开发
+
+### 2.1.CategoryController
+
+```java
+@RestController
+@RequestMapping("/admin/category")
+@Api(tags = "分类相关接口")
+@Slf4j
+public class CategoryController {
+
+    @Autowired
+    private CategoryService categoryService;
+
+    /**
+     * 新增分类
+     * @param categoryDTO
+     * @return
+     */
+    @PostMapping
+    @ApiOperation("新增分类")
+    public Result<String> save(@RequestBody CategoryDTO categoryDTO){
+        log.info("新增分类：{}", categoryDTO);
+        categoryService.save(categoryDTO);
+        return Result.success();
+    }
+
+    /**
+     * 分类分页查询
+     * @param categoryPageQueryDTO
+     * @return
+     */
+    @GetMapping("/page")
+    @ApiOperation("分类分页查询")
+    public Result<PageResult> page(CategoryPageQueryDTO categoryPageQueryDTO){
+        log.info("分页查询：{}", categoryPageQueryDTO);
+        PageResult pageResult = categoryService.pageQuery(categoryPageQueryDTO);
+        return Result.success(pageResult);
+    }
+
+    /**
+     * 删除分类
+     * @param id
+     * @return
+     */
+    @DeleteMapping
+    @ApiOperation("删除分类")
+    public Result<String> deleteById(Long id){
+        log.info("删除分类：{}", id);
+        categoryService.deleteById(id);
+        return Result.success();
+    }
+
+    /**
+     * 修改分类
+     * @param categoryDTO
+     * @return
+     */
+    @PutMapping
+    @ApiOperation("修改分类")
+    public Result<String> update(@RequestBody CategoryDTO categoryDTO){
+        categoryService.update(categoryDTO);
+        return Result.success();
+    }
+
+    /**
+     * 启用、禁用分类
+     * @param status
+     * @param id
+     * @return
+     */
+    @PostMapping("/status/{status}")
+    @ApiOperation("启用禁用分类")
+    public Result<String> startOrStop(@PathVariable("status") Integer status, Long id){
+        categoryService.startOrStop(status,id);
+        return Result.success();
+    }
+
+    /**
+     * 根据类型查询分类
+     * @param type
+     * @return
+     */
+    @GetMapping("/list")
+    @ApiOperation("根据类型查询分类")
+    public Result<List<Category>> list(Integer type){
+        List<Category> list = categoryService.list(type);
+        return Result.success(list);
+    }
+}
+```
+
+### 2.2.CategoryServiceImpl
+
+```java
+/**
+ * 分类业务层
+ */
+@Service
+@Slf4j
+public class CategoryServiceImpl implements CategoryService {
+
+    @Autowired
+    private CategoryMapper categoryMapper;
+    @Autowired
+    private DishMapper dishMapper;
+    @Autowired
+    private SetmealMapper setmealMapper;
+
+    /**
+     * 新增分类
+     * @param categoryDTO
+     */
+    public void save(CategoryDTO categoryDTO) {
+        Category category = new Category();
+        //属性拷贝
+        BeanUtils.copyProperties(categoryDTO, category);
+
+        //分类状态默认为禁用状态0
+        category.setStatus(StatusConstant.DISABLE);
+
+        //设置创建时间、修改时间、创建人、修改人
+        category.setCreateTime(LocalDateTime.now());
+        category.setUpdateTime(LocalDateTime.now());
+        category.setCreateUser(BaseContext.getCurrentId());
+        category.setUpdateUser(BaseContext.getCurrentId());
+
+        categoryMapper.insert(category);
+    }
+
+    /**
+     * 分页查询
+     * @param categoryPageQueryDTO
+     * @return
+     */
+    public PageResult pageQuery(CategoryPageQueryDTO categoryPageQueryDTO) {
+        PageHelper.startPage(categoryPageQueryDTO.getPage(),categoryPageQueryDTO.getPageSize());
+        //下一条sql进行分页，自动加入limit关键字分页
+        Page<Category> page = categoryMapper.pageQuery(categoryPageQueryDTO);
+        return new PageResult(page.getTotal(), page.getResult());
+    }
+
+    /**
+     * 根据id删除分类
+     * @param id
+     */
+    public void deleteById(Long id) {
+        //查询当前分类是否关联了菜品，如果关联了就抛出业务异常
+        Integer count = dishMapper.countByCategoryId(id);
+        if(count > 0){
+            //当前分类下有菜品，不能删除
+            throw new DeletionNotAllowedException(MessageConstant.CATEGORY_BE_RELATED_BY_DISH);
+        }
+
+        //查询当前分类是否关联了套餐，如果关联了就抛出业务异常
+        count = setmealMapper.countByCategoryId(id);
+        if(count > 0){
+            //当前分类下有菜品，不能删除
+            throw new DeletionNotAllowedException(MessageConstant.CATEGORY_BE_RELATED_BY_SETMEAL);
+        }
+
+        //删除分类数据
+        categoryMapper.deleteById(id);
+    }
+
+    /**
+     * 修改分类
+     * @param categoryDTO
+     */
+    public void update(CategoryDTO categoryDTO) {
+        Category category = new Category();
+        BeanUtils.copyProperties(categoryDTO,category);
+
+        //设置修改时间、修改人
+        category.setUpdateTime(LocalDateTime.now());
+        category.setUpdateUser(BaseContext.getCurrentId());
+
+        categoryMapper.update(category);
+    }
+
+    /**
+     * 启用、禁用分类
+     * @param status
+     * @param id
+     */
+    public void startOrStop(Integer status, Long id) {
+        Category category = Category.builder()
+                .id(id)
+                .status(status)
+                .updateTime(LocalDateTime.now())
+                .updateUser(BaseContext.getCurrentId())
+                .build();
+        categoryMapper.update(category);
+    }
+
+    /**
+     * 根据类型查询分类
+     * @param type
+     * @return
+     */
+    public List<Category> list(Integer type) {
+        return categoryMapper.list(type);
+    }
+}
+```
+
+### 2.3.CategoryMapper
+
+```java
+@Mapper
+public interface CategoryMapper {
+
+    /**
+     * 插入数据
+     * @param category
+     */
+    @Insert("insert into category(type, name, sort, status, create_time, update_time, create_user, update_user)" +
+            " VALUES" +
+            " (#{type}, #{name}, #{sort}, #{status}, #{createTime}, #{updateTime}, #{createUser}, #{updateUser})")
+    void insert(Category category);
+
+    /**
+     * 分页查询
+     * @param categoryPageQueryDTO
+     * @return
+     */
+    Page<Category> pageQuery(CategoryPageQueryDTO categoryPageQueryDTO);
+
+    /**
+     * 根据id删除分类
+     * @param id
+     */
+    @Delete("delete from category where id = #{id}")
+    void deleteById(Long id);
+
+    /**
+     * 根据id修改分类
+     * @param category
+     */
+    void update(Category category);
+
+    /**
+     * 根据类型查询分类
+     * @param type
+     * @return
+     */
+    List<Category> list(Integer type);
+}
+```
+
+### 2.4.DishMapper
+
+```java
+@Mapper
+public interface DishMapper {
+
+    /**
+     * 根据分类id查询菜品数量
+     * @param categoryId
+     * @return
+     */
+    @Select("select count(id) from dish where category_id = #{categoryId}")
+    Integer countByCategoryId(Long categoryId);
+
+}
+```
+
+### 2.5.SetmealMapper
+
+```java
+@Mapper
+public interface SetmealMapper {
+
+    /**
+     * 根据分类id查询套餐的数量
+     * @param id
+     * @return
+     */
+    @Select("select count(id) from setmeal where category_id = #{categoryId}")
+    Integer countByCategoryId(Long id);
+
+}
+```
+
+### 2.6.CategoryMapper.xml
+
+```java
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.sky.mapper.CategoryMapper">
+
+    <select id="pageQuery" resultType="com.sky.entity.Category">
+        select * from category
+        <where>
+            <if test="name != null and name != ''">
+                and name like concat('%',#{name},'%')
+            </if>
+            <if test="type != null">
+                and type = #{type}
+            </if>
+        </where>
+        order by sort asc , create_time desc
+    </select>
+
+    <update id="update" parameterType="Category">
+        update category
+        <set>
+            <if test="type != null">
+                type = #{type},
+            </if>
+            <if test="name != null">
+                name = #{name},
+            </if>
+            <if test="sort != null">
+                sort = #{sort},
+            </if>
+            <if test="status != null">
+                status = #{status},
+            </if>
+            <if test="updateTime != null">
+                update_time = #{updateTime},
+            </if>
+            <if test="updateUser != null">
+                update_user = #{updateUser}
+            </if>
+        </set>
+        where id = #{id}
+    </update>
+
+    <select id="list" resultType="Category">
+        select * from category
+        where status = 1
+        <if test="type != null">
+            and type = #{type}
+        </if>
+        order by sort asc,create_time desc
+    </select>
+</mapper>
+```
+
+# 四.菜品管理
+
+## 1.公共字段自动填充
+
+### 1.1.问题分析
+
+业务表中的公共字段：
+
+| **序号** | **字段名**  | **含义** | **数据类型** |
+| -------- | ----------- | -------- | ------------ |
+| 1        | create_time | 创建时间 | datetime     |
+| 2        | create_user | 创建人id | bigint       |
+| 3        | update_time | 修改时间 | datetime     |
+| 4        | update_user | 修改人id | bigint       |
+
+```java
+//设置当前记录的创建时间、修改时间、创建人、修改人
+employee.setCreateTime(LocalDateTime.now());
+employee.setUpdateTime(LocalDateTime.now());
+employee.setCreateUser(BaseContext.getCurrentId());
+employee.setUpdateUser(BaseContext.getCurrentId());
+
+//设置创建时间、修改时间、创建人、修改人
+category.setCreateTime(LocalDateTime.now());
+category.setUpdateTime(LocalDateTime.now());
+category.setCreateUser(BaseContext.getCurrentId());
+category.setUpdateUser(BaseContext.getCurrentId());
+```
+
+问题：代码冗余、不便于后期维护
+
+### 1.2.实现思路
+
+| **序号** | **字段名**  | **含义** | **数据类型** | **操作类型**   |
+| -------- | ----------- | -------- | ------------ | -------------- |
+| 1        | create_time | 创建时间 | datetime     | insert         |
+| 2        | create_user | 创建人id | bigint       | insert         |
+| 3        | update_time | 修改时间 | datetime     | insert、update |
+| 4        | update_user | 修改人id | bigint       | insert、update |
+
+1.自定义注解 AutoFill，用于标识需要进行公共字段自动填充的方法
+
+2.自定义切面类 AutoFillAspect，统一拦截加入了 AutoFill 注解的方法，通过反射为公共字段赋值
+
+3.在 Mapper 的方法上加入 AutoFill 注解
+
+技术点：枚举、注解、AOP、反射
+
+### 1.3.代码开发
+
+#### 1.3.1.OperationType
+
+```java
+/**
+ * 数据库操作类型
+ */
+public enum OperationType {
+
+    /**
+     * 更新操作
+     */
+    UPDATE,
+
+    /**
+     * 插入操作
+     */
+    INSERT
+
+}
+```
+
+#### 1.3.2.AutoFillConstant
+
+```java
+/**
+ * 公共字段自动填充相关常量
+ */
+public class AutoFillConstant {
+    /**
+     * 实体类中的方法名称
+     */
+    public static final String SET_CREATE_TIME = "setCreateTime";
+    public static final String SET_UPDATE_TIME = "setUpdateTime";
+    public static final String SET_CREATE_USER = "setCreateUser";
+    public static final String SET_UPDATE_USER = "setUpdateUser";
+}
+```
+
+#### 1.3.3.AutoFill
+
+```java
+/**
+ * 自定义注解, 用于标识某个方法需要进行功能字段自动填充处理
+ */
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface AutoFill {
+    // 数据库操作类型: UPDATE INSERT
+    OperationType value();
+}
+```
+
+#### 1.3.4.AutoFillAspect
+
+```java
+public class AutoFillAspect {
+    /**
+     * 切入点
+     */
+    @Pointcut("execution(* com.sky.mapper.*.*(..)) && @annotation(com.sky.annotation.AutoFill)")
+    public void autoFillPointCut() {}
+
+    /**
+     * 前置通知
+     */
+    @Before("autoFillPointCut()")
+    public void autoFill(JoinPoint joinPoint) {
+        log.info("开始进行公共字段自动填充...");
+
+        //获取到当前被拦截的方法上的数据库操作类型
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature(); // 方法签名对象
+        AutoFill autoFill = signature.getMethod().getAnnotation(AutoFill.class); // 获得方法上的注解对象
+        OperationType operationType = autoFill.value(); // 获得数据库操作类型
+
+        // 获取到当前被拦截的方法的参数--实体对象
+        Object[] args = joinPoint.getArgs();
+        if(args == null || args.length == 0) {
+            return;
+        }
+        Object entity = args[0];
+
+        // 准备赋值的数据
+        LocalDateTime now = LocalDateTime.now();
+        Long currentId = BaseContext.getCurrentId();
+
+        // 根据当前不同的数据操作类型, 为对应的属性通过反射来赋值
+        if(operationType == OperationType.INSERT) {
+            // 为4个属性赋值
+            try {
+                Method setCreateTime = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_CREATE_TIME, LocalDateTime.class);
+                Method setCreateUser = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_CREATE_USER, Long.class);
+                Method setUpdateTime = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_UPDATE_TIME, LocalDateTime.class);
+                Method setUpdateUser = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_UPDATE_USER, Long.class);
+
+                // 通过反射为对象属性赋值
+                setCreateTime.invoke(entity, now);
+                setCreateUser.invoke(entity, currentId);
+                setUpdateTime.invoke(entity, now);
+                setUpdateUser.invoke(entity, currentId);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }else if(operationType == OperationType.UPDATE) {
+            // 为2个属性赋值
+            try {
+                Method setUpdateTime = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_UPDATE_TIME, LocalDateTime.class);
+                Method setUpdateUser = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_UPDATE_USER, Long.class);
+
+                setUpdateTime.invoke(entity, now);
+                setUpdateUser.invoke(entity, currentId);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+```
+
+#### 1.3.5.Mapper层操作
+
+```java
+@AutoFill(value = OperationType.INSERT)
+@AutoFill(value = OperationType.UPDATE)
+```
+
+## 2.新增菜品
+
+## 3.菜品分页查询
+
+## 4.删除菜品
+
+## 5.修改菜品
+
