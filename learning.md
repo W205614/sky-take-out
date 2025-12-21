@@ -65,36 +65,57 @@
 
 ### 1.1.需求分析和设计
 
-```sql
-CREATE TABLE `employee` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `name` varchar(32) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin NOT NULL COMMENT '姓名',
-  `username` varchar(32) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin NOT NULL COMMENT '用户名',
-  `password` varchar(64) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin NOT NULL COMMENT '密码',
-  `phone` varchar(11) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin NOT NULL COMMENT '手机号',
-  `sex` varchar(2) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin NOT NULL COMMENT '性别',
-  `id_number` varchar(18) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin NOT NULL COMMENT '身份证号',
-  `status` int NOT NULL DEFAULT '1' COMMENT '状态 0:禁用，1:启用',
-  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-```
+#### 1.1.1.接口设计
 
-application/json
+**基本信息:**
 
-{    
+​	path:  /admin/employee
 
-​	"id": 0,
+​	Method:  POST
 
-​	"idNumber": "string",    
+**请求参数:**
 
-​	"name": "string",
+​	Header
 
-​    "phone": "string", 
+| 参数名称     | 参数值           | 是否必须 | 示例 | 备注 |
+| ------------ | ---------------- | -------- | ---- | ---- |
+| Content-Type | application/json | 是       |      |      |
 
-   "sex": "string",
+​	Body
 
-​    "username": "string" 
+| 名称     | 类型    | 是否必须 | 默认值 | 备注   | 其他信息 |
+| -------- | ------- | -------- | ------ | ------ | -------- |
+| id       | integer | 非必须   |        | 员工id | <int64>  |
+| idNumber | string  | 必须     |        | 身份证 |          |
+| name     | string  | 必须     |        | 姓名   |          |
+| phone    | string  | 必须     |        | 手机号 |          |
+| sex      | string  | 必须     |        | 性别   |          |
+| username | string  | 必须     |        | 用户名 |          |
 
-}
+**返回数据**
+
+| 名称 | 类型    | 是否必须 | 默认值 | 备注 | 其他信息 |
+| ---- | ------- | -------- | ------ | ---- | -------- |
+| code | integer | 必须     |        |      | <int32>  |
+| data | object  | 非必须   |        |      |          |
+| msg  | string  | 非必须   |        |      |          |
+
+#### 1.1.2.Employee表结构设计
+
+| 字段名      | **数据类型** | **说明**     | **备注**    |
+| ----------- | ------------ | ------------ | ----------- |
+| id          | bigint       | 主键         | 自增        |
+| name        | varchar(32)  | 姓名         |             |
+| username    | varchar(32)  | 用户名       | 唯一        |
+| password    | varchar(64)  | 密码         |             |
+| phone       | varchar(11)  | 手机号       |             |
+| sex         | varchar(2)   | 性别         |             |
+| id_number   | varchar(18)  | 身份证号     |             |
+| status      | Int          | 账号状态     | 1正常 0锁定 |
+| create_time | Datetime     | 创建时间     |             |
+| update_time | datetime     | 最后修改时间 |             |
+| create_user | bigint       | 创建人id     |             |
+| update_user | bigint       | 最后修改人id |             |
 
 ### 1.2.代码开发
 
@@ -304,7 +325,7 @@ employee.setUpdateUser(BaseContext.getCurrentId());
 
 ### 2.1.需求分析和设计
 
-业务规则:
+**业务规则:**
 
 ​	1.根据页码展示员工信息
 
@@ -312,7 +333,71 @@ employee.setUpdateUser(BaseContext.getCurrentId());
 
 ​	3.分页查询时可以根据需要,输入员工姓名进行查询
 
-Query 参数:name, page, pageSize
+**基本信息:**
+
+​	path:  /admin/employee/page
+
+​	Method:  GET
+
+**请求参数:**
+
+​	Query 参数
+
+| 名称     | 类型   | 是否必须 | 默认值 | 备注       | 其他信息 |
+| -------- | ------ | -------- | ------ | ---------- | -------- |
+| name     | string | 非必须   |        | 员工姓名   |          |
+| page     | string | 必须     |        | 页码       |          |
+| pageSize | string | 必须     |        | 每页记录数 |          |
+
+**返回数据:**
+
+{
+
+​    "code": 0, 
+
+   "msg": null,
+
+​    "data": {
+
+​        "total": 0,
+
+​        "records": [
+
+​            { 
+
+​               "id": 0, 
+
+​               "username": "string",
+
+​                "name": "string", 
+
+​               "password": "string",
+
+​                "phone": "string",
+
+​                "sex": "string", 
+
+​               "idNumber": "string", 
+
+​               "status": 0,
+
+​                "createTime": "string", 
+
+​               "updateTime": "string",
+
+​                "createUser": 0,
+
+​                "updateUser": 0
+
+​            }
+
+​        ]
+
+​    }
+
+ }
+
+
 
 ### 2.2.代码开发
 
@@ -468,7 +553,7 @@ public class JacksonObjectMapper extends ObjectMapper {
 
 ### 3.1.需求分析和设计
 
-业务规则:
+**业务规则:**
 
 ​	1.可以对状态为"启用"的员工账号进行"禁用"操作
 
@@ -476,7 +561,13 @@ public class JacksonObjectMapper extends ObjectMapper {
 
 ​	3.状态为"禁用"的员工账号不能登陆系统
 
-请求参数
+**基本信息:**
+
+​	path:  /admin/employee/status/{status}
+
+​	Method:  POST
+
+**请求参数**
 
 ​	1.Path 参数
 
@@ -662,7 +753,7 @@ Employee getById(Long id);
 
 ## 1.需求分析和设计
 
-业务规则:
+**业务规则:**
 
 ​	1.分类名称必须是唯一的
 
@@ -670,18 +761,28 @@ Employee getById(Long id);
 
 ​	3.新添加的分类状态为默认为"禁用"
 
-```sql
-CREATE TABLE `category` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `type` int DEFAULT NULL COMMENT '类型   1 菜品分类 2 套餐分类',
-  `name` varchar(32) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin NOT NULL COMMENT '分类名称',
-  `sort` int NOT NULL DEFAULT '0' COMMENT '顺序',
-  `status` int DEFAULT NULL COMMENT '分类状态 0:禁用，1:启用',
-  `create_time` datetime DEFAULT NULL COMMENT '创建时间',
-  `update_time` datetime DEFAULT NULL COMMENT '更新时间',
-  `create_user` bigint DEFAULT NULL COMMENT '创建人',
-  `update_user` bigint DEFAULT NULL COMMENT '修改人',
-```
+**category表结构：**
+
+| **字段名**  | **数据类型** | **说明**     | **备注**            |
+| ----------- | ------------ | ------------ | ------------------- |
+| id          | bigint       | 主键         | 自增                |
+| name        | varchar(32)  | 分类名称     | 唯一                |
+| type        | int          | 分类类型     | 1菜品分类 2套餐分类 |
+| sort        | int          | 排序字段     | 用于分类数据的排序  |
+| status      | int          | 状态         | 1启用 0禁用         |
+| create_time | datetime     | 创建时间     |                     |
+| update_time | datetime     | 最后修改时间 |                     |
+| create_user | bigint       | 创建人id     |                     |
+| update_user | bigint       | 最后修改人id |                     |
+
+**接口设计:**
+
+- 新增分类
+- 分类分页查询
+- 根据id删除分类
+- 修改分类
+- 启用禁用分类
+- 根据类型查询分类
 
 ## 2.代码开发
 
@@ -1200,6 +1301,405 @@ public class AutoFillAspect {
 ```
 
 ## 2.新增菜品
+
+### 2.1.需求分析和设计
+
+**业务规则:**
+
+​	1.菜品名称必须唯一
+
+​	2.菜品必须属于某个分类下, 不能单独存在
+
+​	3.新增菜品时可以根据情况选择菜品的口味
+
+​	4.每个菜品必须对应一张图片
+
+**接口设计:**
+
+​	1.根据类型查询分类(分类管理模块已完成)
+
+​	2.文件上传
+
+​	3.新增菜品
+
+**新增菜品请求参数:**
+
+Body 参数 application/json
+
+​	**categoryId** integer <int64> 分类id
+
+​	**description** string  菜品描述
+
+​	**flavors** array[object (DishFlavor)]  口味
+
+​		**dishId** integer <int64> 菜品id
+
+​		**id** integer <int64> 口味id
+
+​		**name** string  口味名称
+
+​		**value** string 口味值
+
+​	**id** integer <int64> 菜品id
+
+​	**image** string 菜品图片路径
+
+​	**name** string 菜品名称
+
+​	**price** number 菜品价格
+
+​	**status** integer <int32> 菜品状态：1为起售，0为停售
+
+示例
+
+```json
+{
+    "categoryId": 0,
+    "description": "string",
+    "flavors": [
+        {
+            "dishId": 0,
+            "id": 0,
+            "name": "string",
+            "value": "string"
+        }
+    ],
+    "id": 0,
+    "image": "string",
+    "name": "string",
+    "price": 0,
+    "status": 0
+}
+```
+
+数据库设计(dish菜品表和dish_flavor口味表):
+
+​	**1.菜品表:dish**
+
+| **字段名**  | **数据类型**  | **说明**     | **备注**    |
+| ----------- | ------------- | ------------ | ----------- |
+| id          | bigint        | 主键         | 自增        |
+| name        | varchar(32)   | 菜品名称     | 唯一        |
+| category_id | bigint        | 分类id       | 逻辑外键    |
+| price       | decimal(10,2) | 菜品价格     |             |
+| image       | varchar(255)  | 图片路径     |             |
+| description | varchar(255)  | 菜品描述     |             |
+| status      | int           | 售卖状态     | 1起售 0停售 |
+| create_time | datetime      | 创建时间     |             |
+| update_time | datetime      | 最后修改时间 |             |
+| create_user | bigint        | 创建人id     |             |
+| update_user | bigint        | 最后修改人id |             |
+
+​	**2.菜品口味表:dish_flavor**
+
+| **字段名** | **数据类型** | **说明** | **备注** |
+| ---------- | ------------ | -------- | -------- |
+| id         | bigint       | 主键     | 自增     |
+| dish_id    | bigint       | 菜品id   | 逻辑外键 |
+| name       | varchar(32)  | 口味名称 |          |
+| value      | varchar(255) | 口味值   |          |
+
+### 2.2.代码开发
+
+#### 2.2.1.文件上传
+
+##### 2.2.1.1.CommonController
+
+```java
+/**
+ * 通用接口
+ */
+@RestController
+@RequestMapping("/admin/common")
+@Api(tags = "通用接口")
+@Slf4j
+public class CommonController {
+    @Autowired
+    private AliOssUtil aliOssUtil;
+
+    /**
+     * 文件上传
+     * @param file
+     * @return
+     */
+    @PostMapping("/upload")
+    @ApiOperation("文件上传")
+    public Result<String> upload(MultipartFile file) {
+        log.info("文件上传: {}", file);
+
+        try {
+            // 原始文件名
+            String originalFilename = file.getOriginalFilename();
+            // 截取原始文件名后缀
+            String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            // 构建新文件名称
+            String objectName = UUID.randomUUID().toString() + extension;
+
+            // 文件的请求路径
+            String filePath = aliOssUtil.upload(file.getBytes(), objectName);
+            return Result.success(filePath);
+        } catch (IOException e) {
+            log.info("文件上传失败: {}", e);
+        }
+
+        return Result.error(MessageConstant.UPLOAD_FAILED);
+    }
+}
+```
+
+##### 2.2.1.2.OssConfiguration
+
+```java
+/**
+ * 配置类, 用于创建AliOssUtil对象
+ */
+@Configuration
+@Slf4j
+public class OssConfiguration {
+    @Bean
+    @ConditionalOnMissingBean
+    public AliOssUtil aliOssUtil(AliOssProperties aliOssProperties) {
+        log.info("开始创建阿里云文件上传工具类对象: {}", aliOssProperties);
+        return new AliOssUtil(aliOssProperties.getEndpoint(),
+                aliOssProperties.getAccessKeyId(),
+                aliOssProperties.getAccessKeySecret(),
+                aliOssProperties.getBucketName());
+    }
+}
+```
+
+##### 2.2.1.3.AliOssUtil
+
+```java
+@Data
+@AllArgsConstructor
+@Slf4j
+public class AliOssUtil {
+
+    private String endpoint;
+    private String accessKeyId;
+    private String accessKeySecret;
+    private String bucketName;
+
+    /**
+     * 文件上传
+     *
+     * @param bytes
+     * @param objectName
+     * @return
+     */
+    public String upload(byte[] bytes, String objectName) {
+
+        // 创建OSSClient实例。
+        OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
+
+        try {
+            // 创建PutObject请求。
+            ossClient.putObject(bucketName, objectName, new ByteArrayInputStream(bytes));
+        } catch (OSSException oe) {
+            System.out.println("Caught an OSSException, which means your request made it to OSS, "
+                    + "but was rejected with an error response for some reason.");
+            System.out.println("Error Message:" + oe.getErrorMessage());
+            System.out.println("Error Code:" + oe.getErrorCode());
+            System.out.println("Request ID:" + oe.getRequestId());
+            System.out.println("Host ID:" + oe.getHostId());
+        } catch (ClientException ce) {
+            System.out.println("Caught an ClientException, which means the client encountered "
+                    + "a serious internal problem while trying to communicate with OSS, "
+                    + "such as not being able to access the network.");
+            System.out.println("Error Message:" + ce.getMessage());
+        } finally {
+            if (ossClient != null) {
+                ossClient.shutdown();
+            }
+        }
+
+        //文件访问路径规则 https://BucketName.Endpoint/ObjectName
+        StringBuilder stringBuilder = new StringBuilder("https://");
+        stringBuilder
+                .append(bucketName)
+                .append(".")
+                .append(endpoint)
+                .append("/")
+                .append(objectName);
+
+        log.info("文件上传到:{}", stringBuilder.toString());
+
+        return stringBuilder.toString();
+    }
+}
+```
+
+##### 2.2.1.4.AliOssProperties
+
+```java
+@Component
+@ConfigurationProperties(prefix = "sky.alioss")
+@Data
+public class AliOssProperties {
+
+    private String endpoint;
+    private String accessKeyId;
+    private String accessKeySecret;
+    private String bucketName;
+
+}
+```
+
+##### 2.2.1.5.配置文件
+
+```yml
+application.yml
+alioss:
+  endpoint: ${sky.alioss.endpoint}
+  access-key-id: ${sky.alioss.access-key-id}
+  access-key-secret: ${sky.alioss.access-key-secret}
+  bucket-name: ${sky.alioss.bucket-name}
+
+application-dev.yml
+  alioss:
+    endpoint: oss-cn-beijing.aliyuncs.com
+    access-key-id: ${OSS_ACCESS_KEY_ID}
+    access-key-secret: ${OSS_ACCESS_KEY_SECRET}
+    bucket-name: java-ai-things
+```
+
+#### 2.2.2.新增菜品
+
+##### 2.2.2.1.DishController
+
+```java
+/**
+ * 菜品管理
+ */
+@RestController
+@RequestMapping("/admin/dish")
+@Api(tags = "菜品相关接口")
+@Slf4j
+public class DishController {
+    @Autowired
+    private DishService dishService;
+    /**
+     * 新增菜品
+     * @param dishDTO
+     * @return
+     */
+    @PostMapping
+    @ApiOperation("新增菜品")
+    public Result save(@RequestBody DishDTO dishDTO) {
+        log.info("新增菜品: {}", dishDTO);
+        dishService.saveWithFlavor(dishDTO);
+        return Result.success();
+    }
+}
+```
+
+##### 2.2.2.2.DishServiceImpl
+
+```java
+@Service
+@Slf4j
+public class DishServiceImpl implements DishService {
+    @Autowired
+    private DishMapper dishMapper;
+    @Autowired
+    private DishFlavorMapper dishFlavorMapper;
+    /**
+     * 新增菜品和对应的口味
+     * @param dishDTO
+     */
+    @Override
+    @Transactional
+    public void saveWithFlavor(DishDTO dishDTO) {
+        Dish dish = new Dish();
+        BeanUtils.copyProperties(dishDTO, dish);
+        // 向菜品表插入一条数据
+        dishMapper.insert(dish);
+
+        // 获取insert语句生成的主键值
+        Long dishId = dish.getId();
+
+        // 向口味表插入多条数据
+        List<DishFlavor> flavors = dishDTO.getFlavors();
+        if(flavors != null && flavors.size() > 0) {
+            flavors.forEach(dishFlavor -> {
+                dishFlavor.setDishId(dishId);
+            });
+            dishFlavorMapper.insertBatch(flavors);
+        }
+    }
+}
+```
+
+##### 2.2.2.3.DishMapper
+
+```java
+@Mapper
+public interface DishMapper {
+
+    /**
+     * 根据分类id查询菜品数量
+     * @param categoryId
+     * @return
+     */
+    @Select("select count(id) from dish where category_id = #{categoryId}")
+    Integer countByCategoryId(Long categoryId);
+
+    /**
+     * 新增菜品
+     * @param dish
+     */
+    @AutoFill(value = OperationType.INSERT)
+    void insert(Dish dish);
+}
+```
+
+##### 2.2.2.4.DisMapper.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.sky.mapper.DishMapper">
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        insert into dish (name, category_id, price, image, description, create_time, update_time, create_user, update_user, status) values
+        (#{name}, #{categoryId}, #{price}, #{image}, #{description}, #{createTime}, #{updateTime}, #{createUser}, #{updateUser}, #{status})
+    </insert>
+
+</mapper>
+```
+
+##### 2.2.2.5.DishFlavorMapper
+
+```java
+@Mapper
+public interface DishFlavorMapper {
+    /**
+     * 批量插入口味表数据
+     * @param flavors
+     */
+    void insertBatch(List<DishFlavor> flavors);
+}
+```
+
+##### 2.2.2.6.DishFlavorMapper.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.sky.mapper.DishFlavorMapper">
+
+    <insert id="insertBatch">
+        insert into dish_flavor (dish_id, name, value) values
+        <foreach collection="flavors" item="df" separator=",">
+            (#{df.dishId}, #{df.name}, #{df.value})
+        </foreach>
+    </insert>
+
+</mapper>
+```
 
 ## 3.菜品分页查询
 
