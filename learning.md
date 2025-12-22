@@ -1703,7 +1703,920 @@ public interface DishFlavorMapper {
 
 ## 3.菜品分页查询
 
+### 3.1.需求分析和设计
+
+**业务规则:**
+
+​	1.根据页码展示数据
+
+​	2.每页展示10条数据
+
+​	3.分页查询时可以根据输入菜品名称,菜品分类,菜品状态进行查询
+
+**基本信息:**
+
+​	path:  /admin/dish/page
+
+​	Method:  GET
+
+**请求参数:**
+
+​	Query参数:
+
+| 名称       | 类型   | 是否必须 | 默认值 | 备注       | 其他信息 |
+| ---------- | ------ | -------- | ------ | ---------- | -------- |
+| categoryId | string | 非必须   |        | 分类id     |          |
+| name       | string | 非必须   |        | 菜品名称   |          |
+| page       | string | 必须     |        | 页码       |          |
+| pageSize   | string | 必须     |        | 每页记录数 |          |
+| status     | string | 非必须   |        | 分类状态   |          |
+
+### 3.2.代码开发
+
+#### 3.2.1.DishPageQueryDTO
+
+```java
+@Data
+public class DishPageQueryDTO implements Serializable {
+
+    private int page;
+
+    private int pageSize;
+
+    private String name;
+
+    //分类id
+    private Integer categoryId;
+
+    //状态 0表示禁用 1表示启用
+    private Integer status;
+
+}
+```
+
+#### 3.2.2.DishVO
+
+返回响应的数据
+
+```java
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class DishVO implements Serializable {
+
+    private Long id;
+    //菜品名称
+    private String name;
+    //菜品分类id
+    private Long categoryId;
+    //菜品价格
+    private BigDecimal price;
+    //图片
+    private String image;
+    //描述信息
+    private String description;
+    //0 停售 1 起售
+    private Integer status;
+    //更新时间
+    private LocalDateTime updateTime;
+    //分类名称
+    private String categoryName;
+    //菜品关联的口味
+    private List<DishFlavor> flavors = new ArrayList<>();
+
+    //private Integer copies;
+}
+```
+
+#### 3.2.3.DishController
+
+```java
+/**
+ * 菜品分页查询
+ * @param dishPageQueryDTO
+ * @return
+ */
+@GetMapping("/page")
+@ApiOperation("菜品分页查询")
+public Result<PageResult> page(DishPageQueryDTO dishPageQueryDTO) {
+    log.info("菜品分页查询: {}", dishPageQueryDTO);
+    PageResult pageResult = dishService.pageQuery(dishPageQueryDTO);
+    return Result.success(pageResult);
+}
+```
+
+#### 3.2.4.DishServiceImpl
+
+```java
+/**
+ * 菜品分页查询
+ * @param dishPageQueryDTO
+ * @return
+ */
+@Override
+public PageResult pageQuery(DishPageQueryDTO dishPageQueryDTO) {
+    PageHelper.startPage(dishPageQueryDTO.getPage(), dishPageQueryDTO.getPageSize());
+    Page<DishVO> page = dishMapper.pageQuery(dishPageQueryDTO);
+    return new PageResult(page.getTotal(), page.getResult());
+}
+```
+
+#### 3.2.5.DishMapper
+
+```java
+/**
+ * 菜品分页查询
+ * @param dishPageQueryDTO
+ * @return
+ */
+Page<DishVO> pageQuery(DishPageQueryDTO dishPageQueryDTO);
+```
+
+#### 3.2.6.DishMapper.xml
+
+```xml
+<select id="pageQuery" resultType="com.sky.vo.DishVO">
+    select d.*, c.name categoryName from dish d left outer join category c on d.category_id = c.id
+    <where>
+        <if test = "name != null">
+            and d.name like concat('%', #{name}, '%')
+        </if>
+        <if test = "categoryId != null">
+            and d.category_id = #{categoryId}
+        </if>
+        <if test = "status != null">
+            and d.status = #{status}
+        </if>
+    </where>
+    order by d.create_time desc
+</select>
+```
+
 ## 4.删除菜品
+
+### 4.1.需求分析和设计
+
+**业务规则:**
+
+​	1.可以一次删除一个菜品, 也可以批量删除菜品
+
+​	2.起售中的菜品不能删除
+
+​	3.被套餐关联的菜品不能删除
+
+​	4.删除菜品后, 关联的口味数据也需要删除
+
+**基本信息:**
+
+​	path:  /admin/dish
+
+​	Method:  DELETE
+
+**请求参数:**
+
+Query 参数
+
+| 名称 | 类型   | 是否必须 | 默认值 | 备注                   | 其他信息 |
+| ---- | ------ | -------- | ------ | ---------------------- | -------- |
+| ids  | string | 必须     |        | 菜品id，之间用逗号分隔 |          |
+
+在进行删除菜品操作时，会涉及到三张表:  dish, dish_flavor, setmeal_dish
+
+```mysql
+CREATE TABLE `setmeal_dish` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `setmeal_id` bigint DEFAULT NULL COMMENT '套餐id',
+  `dish_id` bigint DEFAULT NULL COMMENT '菜品id',
+  `name` varchar(32) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin DEFAULT NULL COMMENT '菜品名称 （冗余字段）',
+  `price` decimal(10,2) DEFAULT NULL COMMENT '菜品单价（冗余字段）',
+  `copies` int DEFAULT NULL COMMENT '菜品份数',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=47 DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_bin COMMENT='套餐菜品关系'
+```
+
+**注意事项：**
+
+- 在dish表中删除菜品基本数据时，同时，也要把关联在dish_flavor表中的数据一块删除。
+- setmeal_dish表为菜品和套餐关联的中间表。
+- 若删除的菜品数据关联着某个套餐，此时，删除失败。
+- 若要删除套餐关联的菜品数据，先解除两者关联，再对菜品进行删除。
+
+### 4.2.代码开发
+
+#### 4.2.1.DishController
+
+```java
+/**
+ * 菜品批量删除
+ * @param ids
+ * @return
+ */
+@DeleteMapping
+@ApiOperation("菜品批量删除")
+public Result delete(@RequestParam List<Long> ids) {
+    log.info("菜品批量删除: {}", ids);
+    dishService.deleteBatch(ids);
+    return Result.success();
+}
+```
+
+#### 4.2.2.DishServiceImpl
+
+```java
+/**
+ * 菜品批量删除
+ * @param ids
+ */
+@Transactional
+@Override
+public void deleteBatch(List<Long> ids) {
+    // 判断当前菜品是否能够删除--是否存在起售中的菜品
+    for (Long id : ids) {
+        Dish dish = dishMapper.getById(id);
+        if(dish.getStatus() == StatusConstant.ENABLE) {
+            // 当前菜品处于起售中, 不能删除
+            throw new DeletionNotAllowedException(MessageConstant.DISH_ON_SALE);
+        }
+    }
+
+    // 判断当前菜品是否能够删除--是否被套餐关联
+    List<Long> setmealIds = setmealDishMapper.getSetmealIdsByDishIds(ids);
+    if(setmealIds != null && setmealIds.size() > 0) {
+        // 当前菜品被套餐关联了, 不能删除
+        throw new DeletionNotAllowedException(MessageConstant.DISH_BE_RELATED_BY_SETMEAL);
+    }
+
+    // 批量删除菜品表中的菜品数据
+    dishMapper.deleteByIds(ids);
+
+    // 批量删除菜品关联的口味数据
+    dishFlavorMapper.deleteByDishIds(ids);
+}
+```
+
+#### 4.2.3.DishMapper
+
+```java
+/**
+ * 根据id查询菜品
+ * @param id
+ * @return
+ */
+@Select("select * from dish where id = #{id}")
+Dish getById(Long id);
+
+/**
+ * 根据id批量删除菜品
+ * @param ids
+ */
+void deleteByIds(List<Long> ids);
+```
+
+#### 4.2.4.DishMapper.xml
+
+```xml
+<delete id="deleteByIds">
+    delete from dish where id in
+    <foreach collection="ids" item="id" separator="," open="(" close=")">
+        #{id}
+    </foreach>
+</delete>
+```
+
+#### 4.2.5.SetmealDishMapper
+
+```java
+/**
+ * 根据菜品id查询对应的套餐id
+ * @param dishIds
+ * @return
+ */
+List<Long> getSetmealIdsByDishIds(List<Long> dishIds);
+```
+
+#### 4.2.6.SetmealDishMapper.xml
+
+```xml
+<select id="getSetmealIdsByDishIds" resultType="java.lang.Long">
+    select setmeal_id from setmeal_dish where  dish_id in
+    <foreach collection="dishIds" item="dishId" separator="," open="(" close=")">
+        #{dishId}
+    </foreach>
+</select>
+```
+
+#### 4.2.7.DishFlavorMapper
+
+```java
+/**
+ * 根据菜品id批量删除对应的口味表
+ * @param dishIds
+ */
+void deleteByDishIds(List<Long> dishIds);
+```
+
+#### 4.2.8.DishFlavorMapper.xml
+
+```xml
+<delete id="deleteByDishIds">
+    delete from dish_flavor where dish_id in
+    <foreach collection="dishIds" item="dishId" separator="," open="(" close=")">
+        #{dishId}
+    </foreach>
+</delete>
+```
 
 ## 5.修改菜品
 
+### 5.1.需求分析和设计
+
+#### 5.1.1接口设计
+
+##### 5.1.1.1.根据id查询菜品
+
+**基本信息:**
+
+​	path:  /admin/dish/{id}
+
+​	Method:  GET
+
+**请求参数:**
+
+​	path参数:
+
+| 名称 | 类型   | 是否必须 | 默认值 | 备注   | 其他信息 |
+| ---- | ------ | -------- | ------ | ------ | -------- |
+| id   | string | 必须     |        | 菜品id |          |
+
+##### 5.1.1.2.修改菜品
+
+**基本信息:**
+
+​	path:  /admin/dish
+
+​	Method:  PUT
+
+**请求参数:** application/json
+
+{
+
+​    "categoryId": 0,
+
+​    "description": "string",
+
+​    "flavors": [
+
+​        {
+
+​            "dishId": 0,
+
+​            "id": 0,
+
+​            "name": "string", 
+
+​           "value": "string"
+
+​        }
+
+​    ],
+
+​    "id": 0,
+
+​    "image": "string",
+
+​    "name": "string",
+
+​    "price": 0,    "status": 0
+
+ }
+
+### 5.2.代码开发
+
+#### 5.2.1.根据id查询菜品
+
+##### 5.2.1.1.DishController
+
+```java
+/**
+ * 根据id查询菜品
+ * @param id
+ * @return
+ */
+@GetMapping("/{id}")
+@ApiOperation("根据id查询菜品")
+public Result<DishVO> getById(@PathVariable Long id) {
+    log.info("根据id查询菜品: {}", id);
+    DishVO dishVO = dishService.getByIdWithFlavor(id);
+    return Result.success(dishVO);
+}
+```
+
+##### 5.2.1.2.DishServiceImpl
+
+```java
+/**
+ * 根据id查询菜品和对应的口味
+ * @param id
+ * @return
+ */
+@Override
+public DishVO getByIdWithFlavor(Long id) {
+    // 根据id查询菜品数据
+    Dish dish = dishMapper.getById(id);
+
+    // 根据菜品id查询口味数据
+    List<DishFlavor> dishFlavors = dishFlavorMapper.getByDishId(id);
+
+    // 将查询到的数据封装到VO
+    DishVO dishVO = new DishVO();
+    BeanUtils.copyProperties(dish, dishVO);
+    dishVO.setFlavors(dishFlavors);
+
+    return dishVO;
+}
+```
+
+##### 5.2.1.3.DishMapper
+
+```java
+/**
+ * 根据id查询菜品
+ * @param id
+ * @return
+ */
+@Select("select * from dish where id = #{id}")
+Dish getById(Long id);
+```
+
+##### 5.2.1.4.DishFlavorMapper
+
+```java
+/**
+ * 根据菜品id查询对应的口味数据
+ * @param dishId
+ * @return
+ */
+@Select("select * from dish_flavor where dish_id = #{dishId}")
+List<DishFlavor> getByDishId(Long dishId);
+```
+
+#### 5.2.2.修改菜品
+
+##### 5.2.2.1.DishController
+
+```java
+/**
+ * 修改菜品
+ * @param dishDTO
+ * @return
+ */
+@PutMapping
+@ApiOperation("修改菜品")
+public Result update(@RequestBody DishDTO dishDTO) {
+    log.info("修改菜品: {}", dishDTO);
+    dishService.updateWithFlavor(dishDTO);
+    return Result.success();
+}
+```
+
+##### 5.2.2.2.DishServiceImpl
+
+```java
+/**
+ * 修改菜品和对应的口味数据
+ * @param dishDTO
+ */
+@Override
+public void updateWithFlavor(DishDTO dishDTO) {
+    Dish dish = new Dish();
+    BeanUtils.copyProperties(dishDTO, dish);
+
+    // 修改菜品基本信息
+    dishMapper.update(dish);
+
+    // 删除原有的口味数据
+    dishFlavorMapper.deleteByDishId(dishDTO.getId());
+
+    // 重新插入口味数据
+    List<DishFlavor> flavors = dishDTO.getFlavors();
+    if(flavors != null && flavors.size() > 0) {
+        flavors.forEach(dishFlavor -> {
+            dishFlavor.setDishId(dishDTO.getId());
+        });
+        dishFlavorMapper.insertBatch(flavors);
+    }
+}
+```
+
+##### 5.2.2.3.DishMapper
+
+```java
+/**
+ * 修改菜品基本信息
+ * @param dish
+ */
+@AutoFill(value = OperationType.UPDATE)
+void update(Dish dish);
+```
+
+##### 5.2.2.4.DishMapper.xml
+
+```xml
+<update id="update">
+    update dish
+    <set>
+        <if test = "name != null">name = #{name},</if>
+        <if test = "categoryId != null">category_id = #{categoryId},</if>
+        <if test = "price != null">price = #{price},</if>
+        <if test = "image != null">image = #{image},</if>
+        <if test = "description != null">description = #{description},</if>
+        <if test = "status != null">status = #{status},</if>
+        <if test = "updateTime != null">update_time = #{updateTime},</if>
+        <if test = "updateUser != null">update_user = #{updateUser},</if>
+    </set>
+    where id = #{id}
+</update>
+```
+
+## 6.菜品起售停售
+
+### 6.1.需求分析和设计
+
+**业务规则:**
+
+​	1.菜品进行起售和停售
+
+​	2.如果菜品停售的话, 包含该菜品的套餐也要停售
+
+**基本信息:**
+
+​	path:  /admin/dish/status/{status}
+
+​	Method:  POST
+
+**请求参数:**
+
+​	Path 参数:  status  string  1为起售，0为停售
+
+​	Query 参数:  id  string  菜品id
+
+### 6.2.代码开发
+
+#### 6.2.1.DishController
+
+```java
+/**
+ * 菜品起售停售
+ * @param status
+ * @param id
+ * @return
+ */
+@PostMapping ("/status/{status}")
+public Result stopOrStart(@PathVariable Integer status, Long id) {
+    log.info("菜品起售停售: {}, {}", status, id);
+    dishService.stopOrStart(status, id);
+    return Result.success();
+}
+```
+
+#### 6.2.2.DishServiceImpl
+
+```java
+/**
+ * 菜品起售停售
+ * @param status
+ * @param id
+ */
+@Override
+public void stopOrStart(Integer status, Long id) {
+    Dish dish = Dish.builder()
+            .status(status)
+            .id(id)
+            .build();
+    dishMapper.update(dish);
+
+    if(status == StatusConstant.DISABLE) {
+        // 将包含该餐品的套餐停售
+        List<Long> dishIds = new ArrayList<>();
+        dishIds.add(id);
+        List<Long> setmealIds = setmealDishMapper.getSetmealIdsByDishIds(dishIds);
+        if(setmealIds != null && setmealIds.size() > 0) {
+            for (Long setmealId : setmealIds) {
+                Setmeal setmeal = Setmeal.builder()
+                        .status(StatusConstant.DISABLE)
+                        .id(setmealId)
+                        .build();
+                setmealMapper.update(setmeal);
+            }
+        }
+    }
+}
+```
+
+#### 6.2.3.SetmealMapper
+
+```java
+/**
+ * 根据id修改套餐
+ * @param setmeal
+ */
+@AutoFill(value = OperationType.UPDATE)
+void update(Setmeal setmeal);
+```
+
+#### 6.2.4.SetmealMapper.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.sky.mapper.SetmealMapper">
+
+    <update id="update" parameterType="Setmeal">
+        update setmeal
+        <set>
+            <if test="name != null">
+                name = #{name},
+            </if>
+            <if test="categoryId != null">
+                category_id = #{categoryId},
+            </if>
+            <if test="price != null">
+                price = #{price},
+            </if>
+            <if test="status != null">
+                status = #{status},
+            </if>
+            <if test="description != null">
+                description = #{description},
+            </if>
+            <if test="image != null">
+                image = #{image},
+            </if>
+            <if test="updateTime != null">
+                update_time = #{updateTime},
+            </if>
+            <if test="updateUser != null">
+                update_user = #{updateUser}
+            </if>
+        </set>
+        where id = #{id}
+    </update>
+
+</mapper>
+```
+
+# 五.套餐管理
+
+## 1.新增套餐
+
+### 1.1.需求分析和设计
+
+**业务规则：**
+
+​	1.套餐名称唯一
+
+​	2.套餐必须属于某个分类
+
+​	3.套餐必须包含菜品
+
+​	4.名称、分类、价格、图片为必填项
+
+​	5.添加菜品窗口需要根据分类类型来展示菜品
+
+​	6.新增的套餐默认为停售状态
+
+**接口设计**（共涉及到4个接口）：
+
+​	1.根据类型查询分类（已完成）
+
+​	2.根据分类id查询菜品
+
+​	3.图片上传（已完成）
+
+​	4.新增套餐
+
+**数据库设计：**
+
+​	setmeal表为套餐表，用于存储套餐的信息。具体表结构如下：
+
+| 字段名      | 数据类型      | 说明         | 备注        |
+| ----------- | ------------- | ------------ | ----------- |
+| id          | bigint        | 主键         | 自增        |
+| name        | varchar(32)   | 套餐名称     | 唯一        |
+| category_id | bigint        | 分类id       | 逻辑外键    |
+| price       | decimal(10,2) | 套餐价格     |             |
+| image       | varchar(255)  | 图片路径     |             |
+| description | varchar(255)  | 套餐描述     |             |
+| status      | int           | 售卖状态     | 1起售 0停售 |
+| create_time | datetime      | 创建时间     |             |
+| update_time | datetime      | 最后修改时间 |             |
+| create_user | bigint        | 创建人id     |             |
+| update_user | bigint        | 最后修改人id |             |
+
+setmeal_dish表为套餐菜品关系表，用于存储套餐和菜品的关联关系。具体表结构如下：
+
+| 字段名     | 数据类型      | 说明     | 备注     |
+| ---------- | ------------- | -------- | -------- |
+| id         | bigint        | 主键     | 自增     |
+| setmeal_id | bigint        | 套餐id   | 逻辑外键 |
+| dish_id    | bigint        | 菜品id   | 逻辑外键 |
+| name       | varchar(32)   | 菜品名称 | 冗余字段 |
+| price      | decimal(10,2) | 菜品单价 | 冗余字段 |
+| copies     | int           | 菜品份数 |          |
+
+### 1.2.代码开发
+
+#### 1.2.1.根据分类id查询菜品
+
+##### 1.2.1.1.DishController
+
+```java
+/**
+ * 根据分类id查询菜品
+ * @param categoryId
+ * @return
+ */
+@GetMapping("/list")
+@ApiOperation("根据分类id查询菜品")
+public Result<List<Dish>> list(Long categoryId){
+    log.info("根据分类id查询菜品: {}", categoryId);
+    List<Dish> list = dishService.list(categoryId);
+    return Result.success(list);
+}
+```
+
+##### 1.2.1.2.DishServiceImpl
+
+```java
+/**
+ * 根据分类id查询菜品
+ * @param categoryId
+ * @return
+ */
+@Override
+public List<Dish> list(Long categoryId) {
+    Dish dish = Dish.builder()
+            .categoryId(categoryId)
+            .status(StatusConstant.ENABLE)
+            .build();
+    return dishMapper.list(dish);
+}
+```
+
+##### 1.2.1.3.DishMapper
+
+```java
+/**
+ * 根据分类id查询菜品
+ * @param dish
+ * @return
+ */
+List<Dish> list(Dish dish);
+```
+
+##### 1.2.1.4.DishMapper.xml
+
+```xml
+<select id="list" resultType="com.sky.entity.Dish">
+    select * from dish
+    <where>
+        <if test="name != null">
+            and name like concat('%',#{name},'%')
+        </if>
+        <if test="categoryId != null">
+            and category_id = #{categoryId}
+        </if>
+        <if test="status != null">
+            and status = #{status}
+        </if>
+    </where>
+    order by create_time desc
+</select>
+```
+
+#### 1.2.2.新增套餐
+
+##### 1.2.2.1.SetmealController
+
+```java
+/**
+ * 套餐管理
+ */
+@RestController
+@RequestMapping("/admin/setmeal")
+@Api(tags = "套餐相关接口")
+@Slf4j
+public class SetmealController {
+
+    @Autowired
+    private SetmealService setmealService;
+
+    /**
+     * 新增套餐
+     * @param setmealDTO
+     * @return
+     */
+    @PostMapping
+    @ApiOperation("新增套餐")
+    public Result save(@RequestBody SetmealDTO setmealDTO) {
+        log.info("新增套餐: {}", setmealDTO);
+        setmealService.saveWithDish(setmealDTO);
+        return Result.success();
+    }
+}
+```
+
+##### 1.2.2.2.SetmealServiceImpl
+
+```java
+@Service
+@Slf4j
+public class SetmealServiceImpl implements SetmealService {
+    @Autowired
+    private SetmealMapper setmealMapper;
+    @Autowired
+    private SetmealDishMapper setmealDishMapper;
+    @Autowired
+    private DishMapper dishMapper;
+
+    /**
+     * 新增套餐
+     * @param setmealDTO
+     */
+    @Override
+    @Transactional
+    public void saveWithDish(SetmealDTO setmealDTO) {
+        Setmeal setmeal = new Setmeal();
+        BeanUtils.copyProperties(setmealDTO, setmeal);
+
+        //向套餐表插入数据
+        setmealMapper.insert(setmeal);
+
+        //获取生成的套餐id
+        Long setmealId = setmeal.getId();
+
+        List<SetmealDish> setmealDishes = setmealDTO.getSetmealDishes();
+        setmealDishes.forEach(setmealDish -> {
+            setmealDish.setSetmealId(setmealId);
+        });
+
+        //保存套餐和菜品的关联关系
+        setmealDishMapper.insertBatch(setmealDishes);
+    }
+}
+```
+
+##### 1.2.2.3.SetmealMapper
+
+```java
+/**
+ * 新增套餐
+ * @param setmeal
+ */
+@AutoFill(value = OperationType.INSERT)
+void insert(Setmeal setmeal);
+```
+
+##### 1.2.2.4.SetmealMapper.xml
+
+```xml
+<insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    insert into setmeal
+    (category_id, name, price, status, description, image, create_time, update_time, create_user, update_user)
+    values (#{categoryId}, #{name}, #{price}, #{status}, #{description}, #{image}, #{createTime}, #{updateTime},
+            #{createUser}, #{updateUser})
+</insert>
+```
+
+##### 1.2.2.5.SetmealDishMapper
+
+```java
+/**
+ * 批量保存套餐和菜品的关联关系
+ * @param setmealDishes
+ */
+void insertBatch(List<SetmealDish> setmealDishes);
+```
+
+##### 1.2.2.6.SetmealDishMapper.xml
+
+```java
+<insert id="insertBatch">
+    insert into setmeal_dish
+    (setmeal_id,dish_id,name,price,copies)
+    values
+    <foreach collection="setmealDishes"  item="sd" separator=",">
+        (#{sd.setmealId},#{sd.dishId},#{sd.name},#{sd.price},#{sd.copies})
+    </foreach>
+</insert>
+```
+
+## 2.套餐分页查询
+
+## 3.删除套餐
+
+## 4.修改套餐
+
+## 5.起售停售套餐
