@@ -2757,7 +2757,98 @@ Page<SetmealVO> pageQuery(SetmealPageQueryDTO setmealPageQueryDTO);
 
 ### 3.1.需求分析和设计
 
+**业务规则：**
 
+​	1.可以一次删除一个套餐，也可以批量删除套餐
+
+​	2.起售中的套餐不能删除
+
+**基本信息:**
+
+​	path:  /admin/setmeal
+
+​	Method:  DELETE
+
+**请求参数:**  Query参数
+
+| 名称 | 类型   | 是否必须 | 默认值 | 备注 | 其他信息 |
+| ---- | ------ | -------- | ------ | ---- | -------- |
+| ids  | string | 必须     |        |      |          |
+
+### 3.2.代码开发
+
+#### 3.2.1.SetmealController
+
+```java
+/**
+ * 批量删除套餐
+ * @param ids
+ * @return
+ */
+@DeleteMapping
+@ApiOperation("批量删除套餐")
+public Result delete(@RequestParam List<Long> ids) {
+    log.info("批量删除套餐: {}", ids);
+    setmealService.deleteBatch(ids);
+    return Result.success();
+}
+```
+
+#### 3.2.2.SetmealServiceImpl
+
+```java
+/**
+ * 批量删除套餐
+ * @param ids
+ */
+@Override
+public void deleteBatch(List<Long> ids) {
+    for (Long id : ids) {
+        Setmeal setmeal = setmealMapper.getById(id);
+        if(StatusConstant.ENABLE == setmeal.getStatus()) {
+            // 起售中的套餐不能删除
+            throw new DeletionNotAllowedException(MessageConstant.SETMEAL_ON_SALE);
+        }
+    }
+
+    for (Long setmealId : ids) {
+        // 删除套餐表中的数据
+        setmealMapper.deleteById(setmealId);
+        // 删除套餐菜品关系表中的数据
+        setmealDishMapper.deleteBySetmealId(setmealId);
+    }
+}
+```
+
+#### 3.2.3.SetmealMapper
+
+```java
+/**
+ * 根据id查询套餐
+ * @param id
+ * @return
+ */
+@Select("select * from setmeal where id = #{id}")
+Setmeal getById(Long id);
+
+/**
+ * 根据id删除套餐
+ * @param setmealId
+ */
+@Delete("delete from setmeal where id = #{id}")
+void deleteById(Long setmealId);
+```
+
+#### 3.2.4.SetmealDishMapper
+
+```java
+/**
+ * 根据套餐id删除套餐和菜品的关联关系
+ * @param setmealId
+ */
+@Delete("delete from setmeal_dish where setmeal_id = #{setmealId}")
+void deleteBySetmealId(Long setmealId);
+```
 
 ## 4.修改套餐
 
