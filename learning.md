@@ -2852,4 +2852,136 @@ void deleteBySetmealId(Long setmealId);
 
 ## 4.修改套餐
 
+### 4.1.需求分析和设计
+
+**接口设计**（共涉及到5个接口）：
+
+​	1.根据id查询套餐
+
+​	2.根据类型查询分类（已完成）
+
+​	3.根据分类id查询菜品（已完成）
+
+​	4.图片上传（已完成）
+
+​	5.修改套餐
+
+**基本信息:  根据id查询套餐**
+
+​	path:  /admin/setmeal/{id}
+
+​	Method:  GET
+
+**请求参数:  Path参数**
+
+​	id  string  套餐id
+
+**基本信息:  修改套餐**
+
+​	path:  /admin/setmeal
+
+​	Method:  PUT
+
+### 4.2.代码开发
+
+#### 4.2.1.根据id查询套餐
+
+##### 4.2.1.1.SetmealController
+
+```java
+/**
+ * 根据id查询套餐
+ * @param id
+ * @return
+ */
+@GetMapping("/{id}")
+@ApiOperation("根据id查询套餐")
+public Result<SetmealVO> getById(@PathVariable Long id) {
+    log.info("根据id查询套餐: {}", id);
+    SetmealVO setmealVO = setmealService.getByIdWithDish(id);
+    return Result.success(setmealVO);
+}
+```
+
+##### 4.2.1.2.SetmealServiceImpl
+
+```java
+    /**
+     * 根据id查询套餐
+     * @param id
+     * @return
+     */
+    @Override
+    public SetmealVO getByIdWithDish(Long id) {
+        Setmeal setmeal = setmealMapper.getById(id);
+        List<SetmealDish> setmealDishes = setmealDishMapper.getBySetmealId(id);
+
+        SetmealVO setmealVO = new SetmealVO();
+        BeanUtils.copyProperties(setmeal, setmealVO);
+        setmealVO.setSetmealDishes(setmealDishes);
+
+        return setmealVO;
+    }
+```
+
+##### 4.2.1.3.SetmealDishMapper
+
+```java
+/**
+ * 根据套餐id查询套餐和菜品的关系
+ * @param setmealId
+ * @return
+ */
+@Select("select * from setmeal_dish where setmeal_id = #{setmealId}")
+List<SetmealDish> getBySetmealId(Long setmealId);
+```
+
+#### 4.2.2.修改套餐
+
+##### 4.2.2.1.SetmealController
+
+```java
+/**
+ * 修改套餐
+ * @param setmealDTO
+ * @return
+ */
+@PutMapping
+@ApiOperation("修改套餐")
+public Result update(@RequestBody SetmealDTO setmealDTO) {
+    setmealService.update(setmealDTO);
+    return Result.success();
+}
+```
+
+##### 4.2.2.2.SetmealServiceImpl
+
+```java
+/**
+ * 修改套餐
+ * @param setmealDTO
+ */
+@Override
+public void update(SetmealDTO setmealDTO) {
+    Setmeal setmeal = new Setmeal();
+    BeanUtils.copyProperties(setmealDTO, setmeal);
+
+    // 根据id修改套餐
+    setmealMapper.update(setmeal);
+
+    Long setmealId = setmealDTO.getId();
+
+    // 根据套餐id删除套餐和菜品的关联关系
+    setmealDishMapper.deleteBySetmealId(setmealId);
+
+    List<SetmealDish> setmealDishes = setmealDTO.getSetmealDishes();
+    setmealDishes.forEach(setmealDish -> {
+        setmealDish.setSetmealId(setmealId);
+    });
+
+    // 批量保存套餐和菜品的关联关系
+    setmealDishMapper.insertBatch(setmealDishes);
+}
+```
+
 ## 5.起售停售套餐
