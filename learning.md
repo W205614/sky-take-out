@@ -2615,7 +2615,149 @@ void insertBatch(List<SetmealDish> setmealDishes);
 
 ## 2.套餐分页查询
 
+### 2.1.需求分析和设计
+
+**业务规则：**
+
+​	1.根据页码进行分页展示
+
+​	2.每页展示10条数据
+
+​	3.可以根据需要，按照套餐名称、分类、售卖状态进行查询
+
+**基本信息:**
+
+​	path:  /admin/setmeal/page
+
+​	Method:  GET
+
+**请求参数:**  Query参数
+
+| 名称       | 类型   | 是否必须 | 默认值 | 备注         | 其他信息 |
+| ---------- | ------ | -------- | ------ | ------------ | -------- |
+| categoryId | string | 非必须   |        | 分类id       |          |
+| name       | string | 非必须   |        | 套餐名称     |          |
+| page       | string | 必须     |        | 页码         |          |
+| pageSize   | string | 必须     |        | 每页记录数   |          |
+| status     | string | 非必须   |        | 套餐起售状态 |          |
+
+**返回响应:**
+
+{
+
+​    "code": 0,
+
+​    "msg": null,
+
+​    "data":{
+
+​        "total": 0,
+
+​        "records": [
+
+​            {
+
+​                "id": 0,
+
+​                "categoryId": 0,
+
+​                "name": "string",
+
+​                "price": 0,
+
+​                "status": 0,
+
+​                "description": "string",
+
+​                "image": "string",
+
+​                "updateTime": "string",
+
+​                "categoryName": "string"
+
+​            }
+
+​        ]
+
+​    }
+
+ }
+
+### 2.2.代码开发
+
+#### 2.2.1.SetmealController
+
+```java
+/**
+ * 分页查询
+ * @param setmealPageQueryDTO
+ * @return
+ */
+@GetMapping("/page")
+@ApiOperation("分页查询")
+public Result<PageResult> page(SetmealPageQueryDTO setmealPageQueryDTO) {
+    log.info("分页查询: {}", setmealPageQueryDTO);
+    PageResult pageResult = setmealService.pageQuery(setmealPageQueryDTO);
+    return Result.success(pageResult);
+}
+```
+
+#### 2.2.2.SetmealServiceImpl
+
+```java
+/**
+ * 分页查询
+ * @param setmealPageQueryDTO
+ * @return
+ */
+@Override
+public PageResult pageQuery(SetmealPageQueryDTO setmealPageQueryDTO) {
+    PageHelper.startPage(setmealPageQueryDTO.getPage(), setmealPageQueryDTO.getPageSize());
+
+    Page<SetmealVO> page = setmealMapper.pageQuery(setmealPageQueryDTO);
+    long total = page.getTotal();
+    List<SetmealVO> records = page.getResult();
+
+    return new PageResult(total, records);
+}
+```
+
+#### 2.2.3.SetmealMapper
+
+```java
+/**
+ * 分页查询
+ * @param setmealPageQueryDTO
+ * @return
+ */
+Page<SetmealVO> pageQuery(SetmealPageQueryDTO setmealPageQueryDTO);
+```
+
+#### 2.2.4.SetmealMapper.xml
+
+```xml
+<select id="pageQuery" resultType="com.sky.vo.SetmealVO">
+    select s.*, c.name categoryName from setmeal s left join category c on s.category_id = c.id
+    <where>
+        <if test = "name != null">
+            and s.name like concat("%", #{name}, '%')
+        </if>
+        <if test = "status != null">
+            and s.status = #{status}
+        </if>
+        <if test = "categoryId != null">
+            and s.category_id = #{categoryId}
+        </if>
+    </where>
+    order by s.create_time desc
+</select>
+```
+
 ## 3.删除套餐
+
+### 3.1.需求分析和设计
+
+
 
 ## 4.修改套餐
 
