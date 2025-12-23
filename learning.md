@@ -2985,3 +2985,80 @@ public void update(SetmealDTO setmealDTO) {
 ```
 
 ## 5.起售停售套餐
+
+### 5.1.需求分析和设计
+
+**基本信息:**
+
+​	path:  /admin/setmeal/status/{status}
+
+  Method:  POST
+
+**业务规则：**
+
+​	1.可以对状态为起售的套餐进行停售操作，可以对状态为停售的套餐进行起售操作
+
+​	2.起售的套餐可以展示在用户端，停售的套餐不能展示在用户端
+
+​	3.起售套餐时，如果套餐内包含停售的菜品，则不能起售
+
+### 5.2.代码开发
+
+#### 5.2.1.SetmealController
+
+```java
+/**
+ * 套餐起售停售
+ * @param status
+ * @param id
+ * @return
+ */
+@PostMapping("/status/{status}")
+@ApiOperation("套餐起售停售")
+public Result startOrStop(@PathVariable Integer status, Long id) {
+    setmealService.startOrStop(status, id);
+    return Result.success();
+}
+```
+
+#### 5.2.2.SetmealServiceImpl
+
+```java
+/**
+ * 套餐起售停售
+ * @param status
+ * @param id
+ */
+@Override
+public void startOrStop(Integer status, Long id) {
+    // 套餐起售时, 判断套餐内是否有停售餐品, 如果有不能起售
+    if(status == StatusConstant.ENABLE) {
+        List<Dish> dishList = dishMapper.getBySetmealId(id);
+        if(dishList != null && dishList.size() > 0) {
+            dishList.forEach(dish -> {
+                if(StatusConstant.DISABLE == dish.getStatus()) {
+                    throw new SetmealEnableFailedException(MessageConstant.SETMEAL_ENABLE_FAILED);
+                }
+            });
+        }
+    }
+
+    Setmeal setmeal = Setmeal.builder()
+            .id(id)
+            .status(status)
+            .build();
+    setmealMapper.update(setmeal);
+}
+```
+
+#### 5.2.3.DishMapper
+
+```java
+/**
+ * 根据套餐id查询菜品
+ * @param setmealId
+ * @return
+ */
+@Select("select a.* from dish a left join setmeal_dish b on a.id = b.dish_id where b.setmeal_id = #{setmealId}")
+List<Dish> getBySetmealId(Long setmealId);
+```
