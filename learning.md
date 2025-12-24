@@ -1,8 +1,8 @@
 **苍穹外卖**
 
-# 一.项目概述
+# 一. 项目概述
 
-## 1.项目结构
+## 1. 项目结构
 
 | **序号** | **名称**     | **说明**                                                     |
 | -------- | ------------ | ------------------------------------------------------------ |
@@ -24,13 +24,17 @@
 
 3.sky-server 子模块中存放的是 配置文件、配置类、拦截器、controller、service、mapper、启动类等
 
-## 2.功能架构
+
+
+## 2. 功能架构
 
 管理端:员工管理,  分类管理,  菜品管理,  套餐管理,  订单管理,  工作台,  数据统计,  来单提醒
 
 用户端:微信登录,  商品浏览,  购物车,  用户下单,  微信支付,  历史订单,  地址管理,  用户催单
 
-## 3.技术选型
+
+
+## 3. 技术选型
 
 用户层:node.js,  VUE.js,  ElementUI,  微信小程序,  apache echarts
 
@@ -42,15 +46,19 @@
 
 工具:Git,  maven,  Junit,  postman
 
-## 4.问题
 
-### 4.1.通过Swagger就可以生成接口文档, 那么我们是否就不需要Yapi, Apifox等工具?
+
+## 4. 问题
+
+### 4.1 通过Swagger就可以生成接口文档, 那么我们是否就不需要Yapi, Apifox等工具?
 
 1.Yapi, Apifox等是在设计阶段使用的工具, 管理和维护接口
 
 2.Swagger在开发阶段使用的框架, 帮助后端开发人员做后端的接口测试
 
-### 4.2.Swagger常用注解
+
+
+### 4.2 Swagger常用注解
 
 | **注解**          | **说明**                                               |
 | ----------------- | ------------------------------------------------------ |
@@ -59,13 +67,15 @@
 | @ApiModelProperty | 用在属性上，描述属性信息                               |
 | @ApiOperation     | 用在方法上，例如Controller的方法，说明方法的用途、作用 |
 
-# 二.员工管理
 
-## 1.新增员工
 
-### 1.1.需求分析和设计
+# 二. 员工管理
 
-#### 1.1.1.接口设计
+## 1. 新增员工
+
+### 1.1 需求分析和设计
+
+#### 1.1.1 接口设计
 
 **基本信息:**
 
@@ -100,7 +110,9 @@
 | data | object  | 非必须   |        |      |          |
 | msg  | string  | 非必须   |        |      |          |
 
-#### 1.1.2.Employee表结构设计
+
+
+#### 1.1.2 Employee表结构设计
 
 | 字段名      | **数据类型** | **说明**     | **备注**    |
 | ----------- | ------------ | ------------ | ----------- |
@@ -117,7 +129,9 @@
 | create_user | bigint       | 创建人id     |             |
 | update_user | bigint       | 最后修改人id |             |
 
-### 1.2.代码开发
+
+
+### 1.2 代码开发
 
 注意:
 
@@ -125,7 +139,9 @@
 
 ​	2.DTO方便封装前端传送的数据,但是对于持久层的数据传递建议使用实体类
 
-#### 1.2.1.EmployeeDTO
+
+
+#### 1.2.1 EmployeeDTO
 
 ```java
 public class EmployeeDTO implements Serializable {
@@ -145,7 +161,9 @@ public class EmployeeDTO implements Serializable {
 }
 ```
 
-#### 1.2.2.Employee
+
+
+#### 1.2.2 Employee
 
 ```java
 public class Employee implements Serializable {
@@ -181,7 +199,9 @@ public class Employee implements Serializable {
 }
 ```
 
-#### 1.2.3.EmployeeController
+
+
+#### 1.2.3 EmployeeController
 
 ```java
 /**
@@ -199,7 +219,9 @@ public Result save(@RequestBody EmployeeDTO employeeDTO) {
 }
 ```
 
-#### 1.2.4.EmployeeServiceImpl
+
+
+#### 1.2.4 EmployeeServiceImpl
 
 ```java
 /**
@@ -232,7 +254,9 @@ public void save(EmployeeDTO employeeDTO) {
 }
 ```
 
-#### 1.2.5.EmployeeMapper
+
+
+#### 1.2.5 EmployeeMapper
 
 ```java
 /**
@@ -245,7 +269,9 @@ public void save(EmployeeDTO employeeDTO) {
 void insert(Employee employee);
 ```
 
-#### 1.2.6.处理已存在账户异常
+
+
+#### 1.2.6 处理已存在账户异常
 
 ```java
 /**
@@ -268,9 +294,11 @@ public Result exceptionHandler(SQLIntegrityConstraintViolationException ex) {
 }
 ```
 
-### 1.3.开发过程中关键问题
 
-#### 1.3.1.如何获取的操作人id
+
+### 1.3 开发过程中关键问题
+
+#### 1.3.1 如何获取的操作人id
 
 每一次的运行ThreadLocal都会创建一个新的线程,线程id是共享的,通过BaseContext来获取对应的id
 
@@ -321,9 +349,11 @@ employee.setCreateUser(BaseContext.getCurrentId());
 employee.setUpdateUser(BaseContext.getCurrentId());
 ```
 
-## 2.员工分页查询
 
-### 2.1.需求分析和设计
+
+## 2. 员工分页查询
+
+### 2.1 需求分析和设计
 
 **业务规则:**
 
@@ -399,9 +429,9 @@ employee.setUpdateUser(BaseContext.getCurrentId());
 
 
 
-### 2.2.代码开发
+### 2.2 代码开发
 
-#### 2.2.1.EmployeePageQueryDTO
+#### 2.2.1 EmployeePageQueryDTO
 
 ```java
 public class EmployeePageQueryDTO implements Serializable {
@@ -418,7 +448,9 @@ public class EmployeePageQueryDTO implements Serializable {
 }
 ```
 
-#### 2.2.2.PageResult
+
+
+#### 2.2.2 PageResult
 
 ```java
 public class PageResult implements Serializable {
@@ -430,7 +462,9 @@ public class PageResult implements Serializable {
 }
 ```
 
-#### 2.2.3.EmployeeController
+
+
+#### 2.2.3 EmployeeController
 
 ```java
 /**
@@ -447,7 +481,9 @@ public Result<PageResult> page(EmployeePageQueryDTO employeePageQueryDTO) {
 }
 ```
 
-#### 2.2.4.EmployeeServiceImpl
+
+
+#### 2.2.4 EmployeeServiceImpl
 
 ```java
 /**
@@ -467,7 +503,9 @@ public PageResult pageQuery(EmployeePageQueryDTO employeePageQueryDTO) {
 }
 ```
 
-#### 2.2.5.EmployeeMapper
+
+
+#### 2.2.5 EmployeeMapper
 
 ```java
 /**
@@ -478,7 +516,9 @@ public PageResult pageQuery(EmployeePageQueryDTO employeePageQueryDTO) {
 Page<Employee> pageQuery(EmployeePageQueryDTO employeePageQueryDTO);
 ```
 
-#### 2.2.6.EmployeeMapper.xml
+
+
+#### 2.2.6 EmployeeMapper.xml
 
 ```java
 <select id="pageQuery" resultType="com.sky.entity.Employee">
@@ -492,9 +532,9 @@ Page<Employee> pageQuery(EmployeePageQueryDTO employeePageQueryDTO);
 </select>
 ```
 
-### 2.3.开发过程问题解决
+### 2.3 开发过程问题解决
 
-#### 2.3.1.如何处理日期的表示
+#### 2.3.1 如何处理日期的表示
 
 通过扩展 Spring MVC 框架的消息转换器
 
@@ -549,9 +589,11 @@ public class JacksonObjectMapper extends ObjectMapper {
 }
 ```
 
-## 3.启用禁用员工账号
 
-### 3.1.需求分析和设计
+
+## 3. 启用禁用员工账号
+
+### 3.1 需求分析和设计
 
 **业务规则:**
 
@@ -577,9 +619,11 @@ public class JacksonObjectMapper extends ObjectMapper {
 
 ​		id
 
-### 3.2.代码开发
 
-#### 3.2.1.EmployeeController
+
+### 3.2 代码开发
+
+#### 3.2.1 EmployeeController
 
 ```java
 /**
@@ -597,7 +641,9 @@ public Result startOrStop(@PathVariable Integer status, Long id) {
 }
 ```
 
-#### 3.2.2.EmployeeServiceImpl
+
+
+#### 3.2.2 EmployeeServiceImpl
 
 ```java
 /**
@@ -615,7 +661,9 @@ public void startOrStop(Integer status, Long id) {
 }
 ```
 
-#### 3.2.3.EmployeeMapper
+
+
+#### 3.2.3 EmployeeMapper
 
 ```java
 /**
@@ -625,7 +673,9 @@ public void startOrStop(Integer status, Long id) {
 void update(Employee employee);
 ```
 
-#### 3.2.4.EmployeeMapper.xml
+
+
+#### 3.2.4 EmployeeMapper.xml
 
 ```java
 <update id="update" parameterType="Employee">
@@ -645,17 +695,21 @@ void update(Employee employee);
 </update>
 ```
 
-## 4.编辑员工
 
-### 4.1.需求分析和设计
 
-#### 4.1.1.根据id查询员工信息
+## 4. 编辑员工
+
+### 4.1 需求分析和设计
+
+#### 4.1.1 根据id查询员工信息
 
 请求参数: Path 参数
 
 ​	id string  员工id
 
-#### 4.1.2.编辑员工信息
+
+
+#### 4.1.2 编辑员工信息
 
 application/json
 
@@ -675,9 +729,11 @@ application/json
 
  }
 
-### 4.2.代码开发
 
-#### 4.2.1.EmployeeController
+
+### 4.2 代码开发
+
+#### 4.2.1 EmployeeController
 
 ```java
 /**
@@ -706,7 +762,9 @@ public Result update(@RequestBody EmployeeDTO employeeDTO) {
 }
 ```
 
-#### 4.2.2.EmployeeServiceImpl
+
+
+#### 4.2.2 EmployeeServiceImpl
 
 ```java
 /**
@@ -737,7 +795,9 @@ public void update(EmployeeDTO employeeDTO) {
 }
 ```
 
-#### 4.2.3.EmployeeMapper
+
+
+#### 4.2.3 EmployeeMapper
 
 ```java
 /**
@@ -749,9 +809,11 @@ public void update(EmployeeDTO employeeDTO) {
 Employee getById(Long id);
 ```
 
-# 三.分类管理
 
-## 1.需求分析和设计
+
+# 三. 分类管理
+
+## 1. 需求分析和设计
 
 **业务规则:**
 
@@ -784,9 +846,11 @@ Employee getById(Long id);
 - 启用禁用分类
 - 根据类型查询分类
 
-## 2.代码开发
 
-### 2.1.CategoryController
+
+## 2. 代码开发
+
+### 2.1 CategoryController
 
 ```java
 @RestController
@@ -876,7 +940,9 @@ public class CategoryController {
 }
 ```
 
-### 2.2.CategoryServiceImpl
+
+
+### 2.2 CategoryServiceImpl
 
 ```java
 /**
@@ -990,7 +1056,9 @@ public class CategoryServiceImpl implements CategoryService {
 }
 ```
 
-### 2.3.CategoryMapper
+
+
+### 2.3 CategoryMapper
 
 ```java
 @Mapper
@@ -1034,7 +1102,9 @@ public interface CategoryMapper {
 }
 ```
 
-### 2.4.DishMapper
+
+
+### 2.4 DishMapper
 
 ```java
 @Mapper
@@ -1051,7 +1121,9 @@ public interface DishMapper {
 }
 ```
 
-### 2.5.SetmealMapper
+
+
+### 2.5 SetmealMapper
 
 ```java
 @Mapper
@@ -1068,7 +1140,9 @@ public interface SetmealMapper {
 }
 ```
 
-### 2.6.CategoryMapper.xml
+
+
+### 2.6 CategoryMapper.xml
 
 ```java
 <?xml version="1.0" encoding="UTF-8" ?>
@@ -1125,11 +1199,13 @@ public interface SetmealMapper {
 </mapper>
 ```
 
-# 四.菜品管理
 
-## 1.公共字段自动填充
 
-### 1.1.问题分析
+# 四. 菜品管理
+
+## 1. 公共字段自动填充
+
+### 1.1 问题分析
 
 业务表中的公共字段：
 
@@ -1156,7 +1232,9 @@ category.setUpdateUser(BaseContext.getCurrentId());
 
 问题：代码冗余、不便于后期维护
 
-### 1.2.实现思路
+
+
+### 1.2 实现思路
 
 | **序号** | **字段名**  | **含义** | **数据类型** | **操作类型**   |
 | -------- | ----------- | -------- | ------------ | -------------- |
@@ -1173,9 +1251,11 @@ category.setUpdateUser(BaseContext.getCurrentId());
 
 技术点：枚举、注解、AOP、反射
 
-### 1.3.代码开发
 
-#### 1.3.1.OperationType
+
+### 1.3 代码开发
+
+#### 1.3.1 OperationType
 
 ```java
 /**
@@ -1196,7 +1276,9 @@ public enum OperationType {
 }
 ```
 
-#### 1.3.2.AutoFillConstant
+
+
+#### 1.3.2 AutoFillConstant
 
 ```java
 /**
@@ -1213,7 +1295,9 @@ public class AutoFillConstant {
 }
 ```
 
-#### 1.3.3.AutoFill
+
+
+#### 1.3.3 AutoFill
 
 ```java
 /**
@@ -1227,7 +1311,9 @@ public @interface AutoFill {
 }
 ```
 
-#### 1.3.4.AutoFillAspect
+
+
+#### 1.3.4 AutoFillAspect
 
 ```java
 public class AutoFillAspect {
@@ -1293,16 +1379,20 @@ public class AutoFillAspect {
 }
 ```
 
-#### 1.3.5.Mapper层操作
+
+
+#### 1.3.5 Mapper层操作
 
 ```java
 @AutoFill(value = OperationType.INSERT)
 @AutoFill(value = OperationType.UPDATE)
 ```
 
-## 2.新增菜品
 
-### 2.1.需求分析和设计
+
+## 2. 新增菜品
+
+### 2.1 需求分析和设计
 
 **业务规则:**
 
@@ -1399,11 +1489,13 @@ Body 参数 application/json
 | name       | varchar(32)  | 口味名称 |          |
 | value      | varchar(255) | 口味值   |          |
 
-### 2.2.代码开发
 
-#### 2.2.1.文件上传
 
-##### 2.2.1.1.CommonController
+### 2.2 代码开发
+
+#### 2.2.1 文件上传
+
+##### 2.2.1.1 CommonController
 
 ```java
 /**
@@ -1447,7 +1539,9 @@ public class CommonController {
 }
 ```
 
-##### 2.2.1.2.OssConfiguration
+
+
+##### 2.2.1.2 OssConfiguration
 
 ```java
 /**
@@ -1468,7 +1562,9 @@ public class OssConfiguration {
 }
 ```
 
-##### 2.2.1.3.AliOssUtil
+
+
+##### 2.2.1.3 AliOssUtil
 
 ```java
 @Data
@@ -1530,7 +1626,9 @@ public class AliOssUtil {
 }
 ```
 
-##### 2.2.1.4.AliOssProperties
+
+
+##### 2.2.1.4 AliOssProperties
 
 ```java
 @Component
@@ -1546,7 +1644,9 @@ public class AliOssProperties {
 }
 ```
 
-##### 2.2.1.5.配置文件
+
+
+##### 2.2.1.5 配置文件
 
 ```yml
 application.yml
@@ -1564,9 +1664,11 @@ application-dev.yml
     bucket-name: java-ai-things
 ```
 
-#### 2.2.2.新增菜品
 
-##### 2.2.2.1.DishController
+
+#### 2.2.2 新增菜品
+
+##### 2.2.2.1 DishController
 
 ```java
 /**
@@ -1594,7 +1696,9 @@ public class DishController {
 }
 ```
 
-##### 2.2.2.2.DishServiceImpl
+
+
+##### 2.2.2.2 DishServiceImpl
 
 ```java
 @Service
@@ -1631,7 +1735,9 @@ public class DishServiceImpl implements DishService {
 }
 ```
 
-##### 2.2.2.3.DishMapper
+
+
+##### 2.2.2.3 DishMapper
 
 ```java
 @Mapper
@@ -1654,7 +1760,9 @@ public interface DishMapper {
 }
 ```
 
-##### 2.2.2.4.DisMapper.xml
+
+
+##### 2.2.2.4 DisMapper.xml
 
 ```xml
 <?xml version="1.0" encoding="UTF-8" ?>
@@ -1670,7 +1778,9 @@ public interface DishMapper {
 </mapper>
 ```
 
-##### 2.2.2.5.DishFlavorMapper
+
+
+##### 2.2.2.5 DishFlavorMapper
 
 ```java
 @Mapper
@@ -1683,7 +1793,9 @@ public interface DishFlavorMapper {
 }
 ```
 
-##### 2.2.2.6.DishFlavorMapper.xml
+
+
+##### 2.2.2.6 DishFlavorMapper.xml
 
 ```xml
 <?xml version="1.0" encoding="UTF-8" ?>
@@ -1701,9 +1813,11 @@ public interface DishFlavorMapper {
 </mapper>
 ```
 
-## 3.菜品分页查询
 
-### 3.1.需求分析和设计
+
+## 3. 菜品分页查询
+
+### 3.1 需求分析和设计
 
 **业务规则:**
 
@@ -1731,9 +1845,11 @@ public interface DishFlavorMapper {
 | pageSize   | string | 必须     |        | 每页记录数 |          |
 | status     | string | 非必须   |        | 分类状态   |          |
 
-### 3.2.代码开发
 
-#### 3.2.1.DishPageQueryDTO
+
+### 3.2 代码开发
+
+#### 3.2.1 DishPageQueryDTO
 
 ```java
 @Data
@@ -1754,7 +1870,9 @@ public class DishPageQueryDTO implements Serializable {
 }
 ```
 
-#### 3.2.2.DishVO
+
+
+#### 3.2.2 DishVO
 
 返回响应的数据
 
@@ -1789,7 +1907,9 @@ public class DishVO implements Serializable {
 }
 ```
 
-#### 3.2.3.DishController
+
+
+#### 3.2.3 DishController
 
 ```java
 /**
@@ -1806,7 +1926,9 @@ public Result<PageResult> page(DishPageQueryDTO dishPageQueryDTO) {
 }
 ```
 
-#### 3.2.4.DishServiceImpl
+
+
+#### 3.2.4 DishServiceImpl
 
 ```java
 /**
@@ -1822,7 +1944,9 @@ public PageResult pageQuery(DishPageQueryDTO dishPageQueryDTO) {
 }
 ```
 
-#### 3.2.5.DishMapper
+
+
+#### 3.2.5 DishMapper
 
 ```java
 /**
@@ -1833,7 +1957,9 @@ public PageResult pageQuery(DishPageQueryDTO dishPageQueryDTO) {
 Page<DishVO> pageQuery(DishPageQueryDTO dishPageQueryDTO);
 ```
 
-#### 3.2.6.DishMapper.xml
+
+
+#### 3.2.6 DishMapper.xml
 
 ```xml
 <select id="pageQuery" resultType="com.sky.vo.DishVO">
@@ -1853,9 +1979,11 @@ Page<DishVO> pageQuery(DishPageQueryDTO dishPageQueryDTO);
 </select>
 ```
 
-## 4.删除菜品
 
-### 4.1.需求分析和设计
+
+## 4. 删除菜品
+
+### 4.1 需求分析和设计
 
 **业务规则:**
 
@@ -1902,9 +2030,11 @@ CREATE TABLE `setmeal_dish` (
 - 若删除的菜品数据关联着某个套餐，此时，删除失败。
 - 若要删除套餐关联的菜品数据，先解除两者关联，再对菜品进行删除。
 
-### 4.2.代码开发
 
-#### 4.2.1.DishController
+
+### 4.2 代码开发
+
+#### 4.2.1 DishController
 
 ```java
 /**
@@ -1921,7 +2051,9 @@ public Result delete(@RequestParam List<Long> ids) {
 }
 ```
 
-#### 4.2.2.DishServiceImpl
+
+
+#### 4.2.2 DishServiceImpl
 
 ```java
 /**
@@ -1955,7 +2087,9 @@ public void deleteBatch(List<Long> ids) {
 }
 ```
 
-#### 4.2.3.DishMapper
+
+
+#### 4.2.3 DishMapper
 
 ```java
 /**
@@ -1973,7 +2107,9 @@ Dish getById(Long id);
 void deleteByIds(List<Long> ids);
 ```
 
-#### 4.2.4.DishMapper.xml
+
+
+#### 4.2.4 DishMapper.xml
 
 ```xml
 <delete id="deleteByIds">
@@ -1984,7 +2120,9 @@ void deleteByIds(List<Long> ids);
 </delete>
 ```
 
-#### 4.2.5.SetmealDishMapper
+
+
+#### 4.2.5 SetmealDishMapper
 
 ```java
 /**
@@ -1995,7 +2133,9 @@ void deleteByIds(List<Long> ids);
 List<Long> getSetmealIdsByDishIds(List<Long> dishIds);
 ```
 
-#### 4.2.6.SetmealDishMapper.xml
+
+
+#### 4.2.6 SetmealDishMapper.xml
 
 ```xml
 <select id="getSetmealIdsByDishIds" resultType="java.lang.Long">
@@ -2006,7 +2146,9 @@ List<Long> getSetmealIdsByDishIds(List<Long> dishIds);
 </select>
 ```
 
-#### 4.2.7.DishFlavorMapper
+
+
+#### 4.2.7 DishFlavorMapper
 
 ```java
 /**
@@ -2016,7 +2158,9 @@ List<Long> getSetmealIdsByDishIds(List<Long> dishIds);
 void deleteByDishIds(List<Long> dishIds);
 ```
 
-#### 4.2.8.DishFlavorMapper.xml
+
+
+#### 4.2.8 DishFlavorMapper.xml
 
 ```xml
 <delete id="deleteByDishIds">
@@ -2027,13 +2171,15 @@ void deleteByDishIds(List<Long> dishIds);
 </delete>
 ```
 
-## 5.修改菜品
 
-### 5.1.需求分析和设计
 
-#### 5.1.1接口设计
+## 5. 修改菜品
 
-##### 5.1.1.1.根据id查询菜品
+### 5.1 需求分析和设计
+
+#### 5.1.1 接口设计
+
+##### 5.1.1.1 根据id查询菜品
 
 **基本信息:**
 
@@ -2049,7 +2195,9 @@ void deleteByDishIds(List<Long> dishIds);
 | ---- | ------ | -------- | ------ | ------ | -------- |
 | id   | string | 必须     |        | 菜品id |          |
 
-##### 5.1.1.2.修改菜品
+
+
+##### 5.1.1.2 修改菜品
 
 **基本信息:**
 
@@ -2091,11 +2239,13 @@ void deleteByDishIds(List<Long> dishIds);
 
  }
 
-### 5.2.代码开发
 
-#### 5.2.1.根据id查询菜品
 
-##### 5.2.1.1.DishController
+### 5.2 代码开发
+
+#### 5.2.1 根据id查询菜品
+
+##### 5.2.1.1 DishController
 
 ```java
 /**
@@ -2112,7 +2262,9 @@ public Result<DishVO> getById(@PathVariable Long id) {
 }
 ```
 
-##### 5.2.1.2.DishServiceImpl
+
+
+##### 5.2.1.2 DishServiceImpl
 
 ```java
 /**
@@ -2137,7 +2289,9 @@ public DishVO getByIdWithFlavor(Long id) {
 }
 ```
 
-##### 5.2.1.3.DishMapper
+
+
+##### 5.2.1.3 DishMapper
 
 ```java
 /**
@@ -2149,7 +2303,9 @@ public DishVO getByIdWithFlavor(Long id) {
 Dish getById(Long id);
 ```
 
-##### 5.2.1.4.DishFlavorMapper
+
+
+##### 5.2.1.4 DishFlavorMapper
 
 ```java
 /**
@@ -2161,9 +2317,11 @@ Dish getById(Long id);
 List<DishFlavor> getByDishId(Long dishId);
 ```
 
-#### 5.2.2.修改菜品
 
-##### 5.2.2.1.DishController
+
+#### 5.2.2 修改菜品
+
+##### 5.2.2.1 DishController
 
 ```java
 /**
@@ -2180,7 +2338,9 @@ public Result update(@RequestBody DishDTO dishDTO) {
 }
 ```
 
-##### 5.2.2.2.DishServiceImpl
+
+
+##### 5.2.2.2 DishServiceImpl
 
 ```java
 /**
@@ -2209,7 +2369,9 @@ public void updateWithFlavor(DishDTO dishDTO) {
 }
 ```
 
-##### 5.2.2.3.DishMapper
+
+
+##### 5.2.2.3 DishMapper
 
 ```java
 /**
@@ -2220,7 +2382,9 @@ public void updateWithFlavor(DishDTO dishDTO) {
 void update(Dish dish);
 ```
 
-##### 5.2.2.4.DishMapper.xml
+
+
+##### 5.2.2.4 DishMapper.xml
 
 ```xml
 <update id="update">
@@ -2239,9 +2403,11 @@ void update(Dish dish);
 </update>
 ```
 
-## 6.菜品起售停售
 
-### 6.1.需求分析和设计
+
+## 6. 菜品起售停售
+
+### 6.1 需求分析和设计
 
 **业务规则:**
 
@@ -2261,9 +2427,11 @@ void update(Dish dish);
 
 ​	Query 参数:  id  string  菜品id
 
-### 6.2.代码开发
 
-#### 6.2.1.DishController
+
+### 6.2 代码开发
+
+#### 6.2.1 DishController
 
 ```java
 /**
@@ -2280,7 +2448,9 @@ public Result stopOrStart(@PathVariable Integer status, Long id) {
 }
 ```
 
-#### 6.2.2.DishServiceImpl
+
+
+#### 6.2.2 DishServiceImpl
 
 ```java
 /**
@@ -2314,7 +2484,9 @@ public void stopOrStart(Integer status, Long id) {
 }
 ```
 
-#### 6.2.3.SetmealMapper
+
+
+#### 6.2.3 SetmealMapper
 
 ```java
 /**
@@ -2325,7 +2497,9 @@ public void stopOrStart(Integer status, Long id) {
 void update(Setmeal setmeal);
 ```
 
-#### 6.2.4.SetmealMapper.xml
+
+
+#### 6.2.4 SetmealMapper.xml
 
 ```xml
 <?xml version="1.0" encoding="UTF-8" ?>
@@ -2367,11 +2541,13 @@ void update(Setmeal setmeal);
 </mapper>
 ```
 
-# 五.套餐管理
 
-## 1.新增套餐
 
-### 1.1.需求分析和设计
+# 五. 套餐管理
+
+## 1. 新增套餐
+
+### 1.1 需求分析和设计
 
 **业务规则：**
 
@@ -2426,11 +2602,13 @@ setmeal_dish表为套餐菜品关系表，用于存储套餐和菜品的关联�
 | price      | decimal(10,2) | 菜品单价 | 冗余字段 |
 | copies     | int           | 菜品份数 |          |
 
-### 1.2.代码开发
 
-#### 1.2.1.根据分类id查询菜品
 
-##### 1.2.1.1.DishController
+### 1.2 代码开发
+
+#### 1.2.1 根据分类id查询菜品
+
+##### 1.2.1.1 DishController
 
 ```java
 /**
@@ -2447,7 +2625,9 @@ public Result<List<Dish>> list(Long categoryId){
 }
 ```
 
-##### 1.2.1.2.DishServiceImpl
+
+
+##### 1.2.1.2 DishServiceImpl
 
 ```java
 /**
@@ -2465,7 +2645,9 @@ public List<Dish> list(Long categoryId) {
 }
 ```
 
-##### 1.2.1.3.DishMapper
+
+
+##### 1.2.1.3 DishMapper
 
 ```java
 /**
@@ -2476,7 +2658,9 @@ public List<Dish> list(Long categoryId) {
 List<Dish> list(Dish dish);
 ```
 
-##### 1.2.1.4.DishMapper.xml
+
+
+##### 1.2.1.4 DishMapper.xml
 
 ```xml
 <select id="list" resultType="com.sky.entity.Dish">
@@ -2496,9 +2680,11 @@ List<Dish> list(Dish dish);
 </select>
 ```
 
-#### 1.2.2.新增套餐
 
-##### 1.2.2.1.SetmealController
+
+#### 1.2.2 新增套餐
+
+##### 1.2.2.1 SetmealController
 
 ```java
 /**
@@ -2528,7 +2714,9 @@ public class SetmealController {
 }
 ```
 
-##### 1.2.2.2.SetmealServiceImpl
+
+
+##### 1.2.2.2 SetmealServiceImpl
 
 ```java
 @Service
@@ -2568,7 +2756,9 @@ public class SetmealServiceImpl implements SetmealService {
 }
 ```
 
-##### 1.2.2.3.SetmealMapper
+
+
+##### 1.2.2.3 SetmealMapper
 
 ```java
 /**
@@ -2579,7 +2769,9 @@ public class SetmealServiceImpl implements SetmealService {
 void insert(Setmeal setmeal);
 ```
 
-##### 1.2.2.4.SetmealMapper.xml
+
+
+##### 1.2.2.4 SetmealMapper.xml
 
 ```xml
 <insert id="insert" useGeneratedKeys="true" keyProperty="id">
@@ -2590,7 +2782,9 @@ void insert(Setmeal setmeal);
 </insert>
 ```
 
-##### 1.2.2.5.SetmealDishMapper
+
+
+##### 1.2.2.5 SetmealDishMapper
 
 ```java
 /**
@@ -2600,7 +2794,9 @@ void insert(Setmeal setmeal);
 void insertBatch(List<SetmealDish> setmealDishes);
 ```
 
-##### 1.2.2.6.SetmealDishMapper.xml
+
+
+##### 1.2.2.6 SetmealDishMapper.xml
 
 ```java
 <insert id="insertBatch">
@@ -2613,9 +2809,11 @@ void insertBatch(List<SetmealDish> setmealDishes);
 </insert>
 ```
 
-## 2.套餐分页查询
 
-### 2.1.需求分析和设计
+
+## 2. 套餐分页查询
+
+### 2.1 需求分析和设计
 
 **业务规则：**
 
@@ -2683,9 +2881,11 @@ void insertBatch(List<SetmealDish> setmealDishes);
 
  }
 
-### 2.2.代码开发
 
-#### 2.2.1.SetmealController
+
+### 2.2 代码开发
+
+#### 2.2.1 SetmealController
 
 ```java
 /**
@@ -2702,7 +2902,9 @@ public Result<PageResult> page(SetmealPageQueryDTO setmealPageQueryDTO) {
 }
 ```
 
-#### 2.2.2.SetmealServiceImpl
+
+
+#### 2.2.2 SetmealServiceImpl
 
 ```java
 /**
@@ -2722,7 +2924,9 @@ public PageResult pageQuery(SetmealPageQueryDTO setmealPageQueryDTO) {
 }
 ```
 
-#### 2.2.3.SetmealMapper
+
+
+#### 2.2.3 SetmealMapper
 
 ```java
 /**
@@ -2733,7 +2937,9 @@ public PageResult pageQuery(SetmealPageQueryDTO setmealPageQueryDTO) {
 Page<SetmealVO> pageQuery(SetmealPageQueryDTO setmealPageQueryDTO);
 ```
 
-#### 2.2.4.SetmealMapper.xml
+
+
+#### 2.2.4 SetmealMapper.xml
 
 ```xml
 <select id="pageQuery" resultType="com.sky.vo.SetmealVO">
@@ -2753,9 +2959,11 @@ Page<SetmealVO> pageQuery(SetmealPageQueryDTO setmealPageQueryDTO);
 </select>
 ```
 
-## 3.删除套餐
 
-### 3.1.需求分析和设计
+
+## 3. 删除套餐
+
+### 3.1 需求分析和设计
 
 **业务规则：**
 
@@ -2775,9 +2983,11 @@ Page<SetmealVO> pageQuery(SetmealPageQueryDTO setmealPageQueryDTO);
 | ---- | ------ | -------- | ------ | ---- | -------- |
 | ids  | string | 必须     |        |      |          |
 
-### 3.2.代码开发
 
-#### 3.2.1.SetmealController
+
+### 3.2 代码开发
+
+#### 3.2.1 SetmealController
 
 ```java
 /**
@@ -2794,7 +3004,9 @@ public Result delete(@RequestParam List<Long> ids) {
 }
 ```
 
-#### 3.2.2.SetmealServiceImpl
+
+
+#### 3.2.2 SetmealServiceImpl
 
 ```java
 /**
@@ -2820,7 +3032,9 @@ public void deleteBatch(List<Long> ids) {
 }
 ```
 
-#### 3.2.3.SetmealMapper
+
+
+#### 3.2.3 SetmealMapper
 
 ```java
 /**
@@ -2839,7 +3053,9 @@ Setmeal getById(Long id);
 void deleteById(Long setmealId);
 ```
 
-#### 3.2.4.SetmealDishMapper
+
+
+#### 3.2.4 SetmealDishMapper
 
 ```java
 /**
@@ -2850,9 +3066,11 @@ void deleteById(Long setmealId);
 void deleteBySetmealId(Long setmealId);
 ```
 
-## 4.修改套餐
 
-### 4.1.需求分析和设计
+
+## 4. 修改套餐
+
+### 4.1 需求分析和设计
 
 **接口设计**（共涉及到5个接口）：
 
@@ -2882,11 +3100,13 @@ void deleteBySetmealId(Long setmealId);
 
 ​	Method:  PUT
 
-### 4.2.代码开发
 
-#### 4.2.1.根据id查询套餐
 
-##### 4.2.1.1.SetmealController
+### 4.2 代码开发
+
+#### 4.2.1 根据id查询套餐
+
+##### 4.2.1.1 SetmealController
 
 ```java
 /**
@@ -2903,7 +3123,9 @@ public Result<SetmealVO> getById(@PathVariable Long id) {
 }
 ```
 
-##### 4.2.1.2.SetmealServiceImpl
+
+
+##### 4.2.1.2 SetmealServiceImpl
 
 ```java
     /**
@@ -2924,7 +3146,9 @@ public Result<SetmealVO> getById(@PathVariable Long id) {
     }
 ```
 
-##### 4.2.1.3.SetmealDishMapper
+
+
+##### 4.2.1.3 SetmealDishMapper
 
 ```java
 /**
@@ -2936,9 +3160,11 @@ public Result<SetmealVO> getById(@PathVariable Long id) {
 List<SetmealDish> getBySetmealId(Long setmealId);
 ```
 
-#### 4.2.2.修改套餐
 
-##### 4.2.2.1.SetmealController
+
+#### 4.2.2 修改套餐
+
+##### 4.2.2.1 SetmealController
 
 ```java
 /**
@@ -2954,7 +3180,9 @@ public Result update(@RequestBody SetmealDTO setmealDTO) {
 }
 ```
 
-##### 4.2.2.2.SetmealServiceImpl
+
+
+##### 4.2.2.2 SetmealServiceImpl
 
 ```java
 /**
@@ -2984,9 +3212,11 @@ public void update(SetmealDTO setmealDTO) {
 }
 ```
 
-## 5.起售停售套餐
 
-### 5.1.需求分析和设计
+
+## 5. 起售停售套餐
+
+### 5.1 需求分析和设计
 
 **基本信息:**
 
@@ -3002,9 +3232,11 @@ public void update(SetmealDTO setmealDTO) {
 
 ​	3.起售套餐时，如果套餐内包含停售的菜品，则不能起售
 
-### 5.2.代码开发
 
-#### 5.2.1.SetmealController
+
+### 5.2 代码开发
+
+#### 5.2.1 SetmealController
 
 ```java
 /**
@@ -3021,7 +3253,9 @@ public Result startOrStop(@PathVariable Integer status, Long id) {
 }
 ```
 
-#### 5.2.2.SetmealServiceImpl
+
+
+#### 5.2.2 SetmealServiceImpl
 
 ```java
 /**
@@ -3051,7 +3285,9 @@ public void startOrStop(Integer status, Long id) {
 }
 ```
 
-#### 5.2.3.DishMapper
+
+
+#### 5.2.3 DishMapper
 
 ```java
 /**
@@ -3061,4 +3297,630 @@ public void startOrStop(Integer status, Long id) {
  */
 @Select("select a.* from dish a left join setmeal_dish b on a.id = b.dish_id where b.setmeal_id = #{setmealId}")
 List<Dish> getBySetmealId(Long setmealId);
+```
+
+# 六. 店铺营业状态设置
+
+## 1. Redis入门
+
+### 1.1 Redis简介
+
+Redis是一个基于**内存**的key-value结构数据库。Redis 是互联网技术领域使用最为广泛的**存储中间件**。
+
+**官网：**https://redis.io
+**中文网：**https://www.redis.net.cn/
+
+**key-value结构存储：** 
+
+**主要特点：**
+
+- 基于内存存储，读写性能高  
+- 适合存储热点数据（热点商品、资讯、新闻）
+- 企业应用广泛
+
+Redis是用C语言开发的一个开源的高性能键值对(key-value)数据库，官方提供的数据是可以达到100000+的QPS（每秒内查询次数）。它存储的value类型比较丰富，也被称为结构化的NoSql数据库。
+
+NoSql（Not Only SQL），不仅仅是SQL，泛指**非关系型数据库**。NoSql数据库并不是要取代关系型数据库，而是关系型数据库的补充。
+
+**关系型数据库(RDBMS)：**
+
+- Mysql
+- Oracle
+- DB2
+- SQLServer
+
+**非关系型数据库(NoSql)：**
+
+- Redis
+- Mongo db
+- MemCached
+
+### 1.2 Redis服务启动与停止
+
+以window版Redis进行演示：
+
+#### 1.2.1 服务启动命令
+
+**redis-server.exe redis.windows.conf** 
+
+Redis服务默认端口号为 **6379** ，通过快捷键**Ctrl + C** 即可停止Redis服务
+
+当Redis服务启动成功后，可通过客户端进行连接。
+
+#### 1.2.2 客户端连接命令
+
+**redis-cli.exe** 
+
+通过redis-cli.exe命令默认连接的是本地的redis服务，并且使用默认6379端口。也可以通过指定如下参数连接：
+
+- -h ip地址
+- -p 端口号
+- -a 密码（如果需要）
+
+#### 1.2.3 修改Redis配置文件
+
+设置Redis服务密码，修改redis.windows.conf
+
+```
+requirepass 123456
+```
+
+**注意：**
+
+- 修改密码后需要重启Redis服务才能生效
+- Redis配置文件中 # 表示注释
+
+重启Redis后，再次连接Redis时，需加上密码，否则连接失败。
+
+```
+redis-cli.exe -h localhost -p 6379 -a 123456 
+```
+
+此时，-h 和 -p 参数可省略不写。
+
+## 2. Redis数据类型
+
+### 2.1 五种常用数据类型介绍
+
+Redis存储的是key-value结构的数据，其中key是字符串类型，value有5种常用的数据类型：
+
+- 字符串 string
+- 哈希 hash
+- 列表 list
+- 集合 set
+- 有序集合 sorted set / zset
+
+
+
+### 2.2 各种数据类型特点 
+
+**解释说明：**
+
+- 字符串(string)：普通字符串，Redis中最简单的数据类型
+- 哈希(hash)：也叫散列，类似于Java中的HashMap结构
+- 列表(list)：按照插入顺序排序，可以有重复元素，类似于Java中的LinkedList
+- 集合(set)：无序集合，没有重复元素，类似于Java中的HashSet
+- 有序集合(sorted set/zset)：集合中每个元素关联一个分数(score)，根据分数升序排序，没有重复元素
+
+
+
+## 3. Redis常用命令
+
+### 3.1 字符串操作命令
+
+Redis 中字符串类型常用命令：
+
+- **SET** key value 					         设置指定key的值
+- **GET** key                                        获取指定key的值
+- **SETEX** key seconds value         设置指定key的值，并将 key 的过期时间设为 seconds 秒
+- **SETNX** key value                        只有在 key    不存在时设置 key 的值
+
+更多命令可以参考Redis中文网：https://www.redis.net.cn
+
+
+
+### 3.2 哈希操作命令
+
+Redis hash 是一个string类型的 field 和 value 的映射表，hash特别适合用于存储对象，常用命令：
+
+- **HSET** key field value             将哈希表 key 中的字段 field 的值设为 value
+- **HGET** key field                       获取存储在哈希表中指定字段的值
+- **HDEL** key field                       删除存储在哈希表中的指定字段
+- **HKEYS** key                              获取哈希表中所有字段
+- **HVALS** key                              获取哈希表中所有值 
+
+
+
+### 3.3 列表操作命令
+
+Redis 列表是简单的字符串列表，按照插入顺序排序，常用命令：
+
+- **LPUSH** key value1 [value2]         将一个或多个值插入到列表头部
+- **LRANGE** key start stop                获取列表指定范围内的元素
+- **RPOP** key                                       移除并获取列表最后一个元素
+- **LLEN** key                                        获取列表长度
+- **BRPOP** key1 [key2 ] timeout       移出并获取列表的最后一个元素， 如果列表没有元素会阻塞列表直到等待超    时或发现可弹出元素为止 
+
+
+
+### 3.4 集合操作命令
+
+Redis set 是string类型的无序集合。集合成员是唯一的，这就意味着集合中不能出现重复的数据，常用命令：
+
+- **SADD** key member1 [member2]            向集合添加一个或多个成员
+- **SMEMBERS** key                                         返回集合中的所有成员
+- **SCARD** key                                                  获取集合的成员数
+- **SINTER** key1 [key2]                                   返回给定所有集合的交集
+- **SUNION** key1 [key2]                                 返回所有给定集合的并集
+- **SREM** key member1 [member2]            移除集合中一个或多个成员 
+
+
+
+### 3.5 有序集合操作命令
+
+Redis有序集合是string类型元素的集合，且不允许有重复成员。每个元素都会关联一个double类型的分数。常用命令：
+
+常用命令：
+
+- **ZADD** key score1 member1 [score2 member2]     向有序集合添加一个或多个成员
+- **ZRANGE** key start stop [WITHSCORES]                     通过索引区间返回有序集合中指定区间内的成员
+- **ZINCRBY** key increment member                              有序集合中对指定成员的分数加上增量 increment
+- **ZREM** key member [member ...]                                移除有序集合中的一个或多个成员 
+
+
+
+### 3.6 通用命令
+
+Redis的通用命令是不分数据类型的，都可以使用的命令：
+
+- KEYS pattern 		查找所有符合给定模式( pattern)的 key 
+- EXISTS key 		检查给定 key 是否存在
+- TYPE key 		返回 key 所储存的值的类型
+- DEL key 		该命令用于在 key 存在是删除 key
+
+
+
+## 4. 在Java中操作Redis
+
+### 4.1 Redis的Java客户端
+
+前面我们讲解了Redis的常用命令，这些命令是我们操作Redis的基础，那么我们在java程序中应该如何操作Redis呢？这就需要使用Redis的Java客户端，就如同我们使用JDBC操作MySQL数据库一样。
+
+Redis 的 Java 客户端很多，常用的几种：
+
+- Jedis
+- Lettuce
+- Spring Data Redis
+
+Spring 对 Redis 客户端进行了整合，提供了 Spring Data Redis，在Spring Boot项目中还提供了对应的Starter，即 spring-boot-starter-data-redis。
+
+我们重点学习**Spring Data Redis**。
+
+
+
+### 4.2 Spring Data Redis使用方式
+
+#### 4.2.1 介绍
+
+Spring Data Redis 是 Spring 的一部分，提供了在 Spring 应用中通过简单的配置就可以访问 Redis 服务，对 Redis 底层开发包进行了高度封装。在 Spring 项目中，可以使用Spring Data Redis来简化 Redis 操作。
+
+网址：https://spring.io/projects/spring-data-redis 
+
+Spring Boot提供了对应的Starter，maven坐标：
+
+```xml
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+```
+
+Spring Data Redis中提供了一个高度封装的类：**RedisTemplate**，对相关api进行了归类封装,将同一类型操作封装为operation接口，具体分类如下：
+
+- ValueOperations：string数据操作
+- SetOperations：set类型数据操作
+- ZSetOperations：zset类型数据操作
+- HashOperations：hash类型的数据操作
+- ListOperations：list类型的数据操作
+
+
+
+#### 4.2.2 环境搭建
+
+进入到sky-server模块
+
+**1). 导入Spring Data Redis的maven坐标(已完成)**
+
+```xml
+<dependency>
+     <groupId>org.springframework.boot</groupId>
+     <artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+```
+
+
+
+**2). 配置Redis数据源**
+
+在application-dev.yml中添加
+
+```yaml
+sky:
+  redis:
+    host: localhost
+    port: 6379
+    password: 123456
+    database: 10
+```
+
+**解释说明：**
+
+database:指定使用Redis的哪个数据库，Redis服务启动后默认有16个数据库，编号分别是从0到15。
+
+可以通过修改Redis配置文件来指定数据库的数量。
+
+在application.yml中添加读取application-dev.yml中的相关Redis配置
+
+```yaml
+spring:
+  profiles:
+    active: dev
+  redis:
+    host: ${sky.redis.host}
+    port: ${sky.redis.port}
+    password: ${sky.redis.password}
+    database: ${sky.redis.database}
+```
+
+
+
+**3). 编写配置类，创建RedisTemplate对象**
+
+```java
+package com.sky.config;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+@Configuration
+@Slf4j
+public class RedisConfiguration {
+
+    @Bean
+    public RedisTemplate redisTemplate(RedisConnectionFactory redisConnectionFactory){
+        log.info("开始创建redis模板对象...");
+        RedisTemplate redisTemplate = new RedisTemplate();
+        //设置redis的连接工厂对象
+        redisTemplate.setConnectionFactory(redisConnectionFactory);
+        //设置redis key的序列化器
+        redisTemplate.setKeySerializer(new StringRedisSerializer());
+        return redisTemplate;
+    }
+}
+```
+
+**解释说明：**
+
+当前配置类不是必须的，因为 Spring Boot 框架会自动装配 RedisTemplate 对象，但是默认的key序列化器为
+
+JdkSerializationRedisSerializer，导致我们存到Redis中后的数据和原始数据有差别，故设置为
+
+StringRedisSerializer序列化器。
+
+
+
+**4). 通过RedisTemplate对象操作Redis**
+
+在test下新建测试类
+
+```java
+package com.sky.test;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.*;
+
+@SpringBootTest
+public class SpringDataRedisTest {
+    @Autowired
+    private RedisTemplate redisTemplate;
+
+    @Test
+    public void testRedisTemplate(){
+        System.out.println(redisTemplate);
+        //string数据操作
+        ValueOperations valueOperations = redisTemplate.opsForValue();
+        //hash类型的数据操作
+        HashOperations hashOperations = redisTemplate.opsForHash();
+        //list类型的数据操作
+        ListOperations listOperations = redisTemplate.opsForList();
+        //set类型数据操作
+        SetOperations setOperations = redisTemplate.opsForSet();
+        //zset类型数据操作
+        ZSetOperations zSetOperations = redisTemplate.opsForZSet();
+    }
+}
+```
+
+上述环境搭建完毕后，接下来，我们就来具体对常见5种数据类型进行操作。
+
+
+
+#### 4.2.3 操作常见类型数据
+
+**1). 操作字符串类型数据**
+
+```java
+	/**
+     * 操作字符串类型的数据
+     */
+    @Test
+    public void testString(){
+        // set get setex setnx
+        redisTemplate.opsForValue().set("name","小明");
+        String city = (String) redisTemplate.opsForValue().get("name");
+        System.out.println(city);
+        redisTemplate.opsForValue().set("code","1234",3, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().setIfAbsent("lock","1");
+        redisTemplate.opsForValue().setIfAbsent("lock","2");
+    }
+```
+
+
+
+**2). 操作哈希类型数据**
+
+```java
+	/**
+     * 操作哈希类型的数据
+     */
+    @Test
+    public void testHash(){
+        //hset hget hdel hkeys hvals
+        HashOperations hashOperations = redisTemplate.opsForHash();
+
+        hashOperations.put("100","name","tom");
+        hashOperations.put("100","age","20");
+
+        String name = (String) hashOperations.get("100", "name");
+        System.out.println(name);
+
+        Set keys = hashOperations.keys("100");
+        System.out.println(keys);
+
+        List values = hashOperations.values("100");
+        System.out.println(values);
+
+        hashOperations.delete("100","age");
+    }
+```
+
+
+
+**3). 操作列表类型数据**
+
+```java
+	/**
+     * 操作列表类型的数据
+     */
+    @Test
+    public void testList(){
+        //lpush lrange rpop llen
+        ListOperations listOperations = redisTemplate.opsForList();
+
+        listOperations.leftPushAll("mylist","a","b","c");
+        listOperations.leftPush("mylist","d");
+
+        List mylist = listOperations.range("mylist", 0, -1);
+        System.out.println(mylist);
+
+        listOperations.rightPop("mylist");
+
+        Long size = listOperations.size("mylist");
+        System.out.println(size);
+    }
+```
+
+
+
+**4). 操作集合类型数据**
+
+```java
+	/**
+     * 操作集合类型的数据
+     */
+    @Test
+    public void testSet(){
+        //sadd smembers scard sinter sunion srem
+        SetOperations setOperations = redisTemplate.opsForSet();
+
+        setOperations.add("set1","a","b","c","d");
+        setOperations.add("set2","a","b","x","y");
+
+        Set members = setOperations.members("set1");
+        System.out.println(members);
+
+        Long size = setOperations.size("set1");
+        System.out.println(size);
+
+        Set intersect = setOperations.intersect("set1", "set2");
+        System.out.println(intersect);
+
+        Set union = setOperations.union("set1", "set2");
+        System.out.println(union);
+
+        setOperations.remove("set1","a","b");
+    }
+```
+
+
+
+**5). 操作有序集合类型数据**
+
+```java
+	/**
+     * 操作有序集合类型的数据
+     */
+    @Test
+    public void testZset(){
+        //zadd zrange zincrby zrem
+        ZSetOperations zSetOperations = redisTemplate.opsForZSet();
+
+        zSetOperations.add("zset1","a",10);
+        zSetOperations.add("zset1","b",12);
+        zSetOperations.add("zset1","c",9);
+
+        Set zset1 = zSetOperations.range("zset1", 0, -1);
+        System.out.println(zset1);
+
+        zSetOperations.incrementScore("zset1","c",10);
+
+        zSetOperations.remove("zset1","a","b");
+    }
+```
+
+
+
+**6). 通用命令操作**
+
+```java
+	/**
+     * 通用命令操作
+     */
+    @Test
+    public void testCommon(){
+        //keys exists type del
+        Set keys = redisTemplate.keys("*");
+        System.out.println(keys);
+
+        Boolean name = redisTemplate.hasKey("name");
+        Boolean set1 = redisTemplate.hasKey("set1");
+
+        for (Object key : keys) {
+            DataType type = redisTemplate.type(key);
+            System.out.println(type.name());
+        }
+
+        redisTemplate.delete("mylist");
+    }
+```
+
+
+
+## 5. 店铺营业状态设置
+
+### 5.1 需求分析和设计
+
+**接口设计:**
+
+​	1.设置营业状态
+
+​	2.管理端查询营业状态
+
+​	3.用户端查询营业状态
+
+**基本信息:**
+
+​	1.设置营业状态:
+
+​		path:  /admin/shop/{status}
+
+​		Method:  PUT
+
+​		请求参数:  path参数
+
+​			status  string  必需  店铺营业状态：1为营业，0为打烊
+
+​	2.管理端查询营业状态
+
+​		path:  /admin/shop/status
+
+​		Method:  GET
+
+​		请求参数:  无
+
+​	3.用户端查询营业状态
+
+​		path:  /user/shop/status
+
+​		Method:  GET
+
+​		请求参数:  无
+
+
+
+### 5.2 代码开发
+
+#### 5.2.1 管理端
+
+```java
+@RestController("adminShopController")
+@RequestMapping("/admin/shop")
+@Api(tags = "店铺相关接口")
+@Slf4j
+public class ShopController {
+    public static final String KEY = "SHOP_STATUS";
+
+    @Autowired
+    private RedisTemplate redisTemplate;
+
+    /**
+     * 设置店铺的营业状态
+     * @param status
+     * @return
+     */
+    @PutMapping("/{status}")
+    @ApiOperation("设置店铺的营业状态")
+    public Result setStatus(@PathVariable Integer status) {
+        log.info("设置店铺的营业状态为: {}", status == 1 ? "营业中" : "打烊中");
+        redisTemplate.opsForValue().set(KEY, status);
+        return Result.success();
+    }
+
+    /**
+     * 获取店铺的营业状态
+     * @return
+     */
+    @GetMapping("/status")
+    @ApiOperation("获取店铺的营业状态")
+    public Result<Integer> getStatus() {
+        Integer status = (Integer) redisTemplate.opsForValue().get(KEY);
+        log.info("获取到店铺的营业状态为: {}", status == 1 ? "营业中" : "打烊中");
+        return Result.success(status);
+    }
+}
+```
+
+
+
+#### 5.2.2 用户端
+
+```java
+@RestController("userShopController")
+@RequestMapping("/user/shop")
+@Api(tags = "店铺相关接口")
+@Slf4j
+public class ShopController {
+    public static final String KEY = "SHOP_STATUS";
+
+    @Autowired
+    private RedisTemplate redisTemplate;
+
+    /**
+     * 获取店铺的营业状态
+     * @return
+     */
+    @GetMapping("/status")
+    @ApiOperation("获取店铺的营业状态")
+    public Result<Integer> getStatus() {
+        Integer status = (Integer) redisTemplate.opsForValue().get(KEY);
+        log.info("获取到店铺的营业状态为: {}", status == 1 ? "营业中" : "打烊中");
+        return Result.success(status);
+    }
+}
 ```
