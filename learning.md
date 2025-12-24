@@ -5187,5 +5187,489 @@ public class SetmealController {
 
 
 
+# 八. 缓存商品及购物车
+
+## 1. 缓存菜品
+
+### 1.1 实现思路
+
+缓存逻辑分析:
+
+​	1.每个分类下的菜品保存一份缓存数据
+
+​	2.数据库中的菜品数据有变更时清理缓存数据
+
+### 1.2 代码开发
+
+#### 1.2.1 管理端
+
+```java
+   /**
+     * 新增菜品
+     * @param dishDTO
+     * @return
+     */
+    @PostMapping
+    @ApiOperation("新增菜品")
+    public Result save(@RequestBody DishDTO dishDTO) {
+        log.info("新增菜品: {}", dishDTO);
+        dishService.saveWithFlavor(dishDTO);
+
+        // 清理缓存数据
+        String key = "dish_" + dishDTO.getCategoryId();
+        cleanCache(key);
+        return Result.success();
+    }
+
+
+    /**
+     * 菜品批量删除
+     * @param ids
+     * @return
+     */
+    @DeleteMapping
+    @ApiOperation("菜品批量删除")
+    public Result delete(@RequestParam List<Long> ids) {
+        log.info("菜品批量删除: {}", ids);
+        dishService.deleteBatch(ids);
+
+        // 将所有的菜品缓存数据清理掉, 所有以dish_开头的key
+        cleanCache("dis_*");
+        return Result.success();
+    }
+
+
+    /**
+     * 修改菜品
+     * @param dishDTO
+     * @return
+     */
+    @PutMapping
+    @ApiOperation("修改菜品")
+    public Result update(@RequestBody DishDTO dishDTO) {
+        log.info("修改菜品: {}", dishDTO);
+        dishService.updateWithFlavor(dishDTO);
+
+        // 将所有的菜品缓存数据清理掉, 所有以dish_开头的key
+        cleanCache("dis_*");
+        return Result.success();
+    }
+
+    /**
+     * 菜品起售停售
+     * @param status
+     * @param id
+     * @return
+     */
+    @PostMapping ("/status/{status}")
+    public Result stopOrStart(@PathVariable Integer status, Long id) {
+        log.info("菜品起售停售: {}, {}", status, id);
+        dishService.stopOrStart(status, id);
+
+        // 将所有的菜品缓存数据清理掉, 所有以dish_开头的key
+        cleanCache("dis_*");
+        return Result.success();
+    }
+
+
+    private void cleanCache(String pattern) {
+        Set keys = redisTemplate.keys(pattern);
+        redisTemplate.delete(keys);
+    }
+```
+
+
+
+#### 1.2.2 用户端
+
+```java
+public Result<List<DishVO>> list(Long categoryId) {
+    // 构建redis中的key, 规则: dish_分类id
+    String key = "dish_" + categoryId;
+
+    // 查询redis中是否存在菜品数据
+    List<DishVO> list = (List<DishVO>) redisTemplate.opsForValue().get(key);
+    if(list != null && list.size() > 0) {
+        // 如果存在, 直接返回, 无须查询数据库
+        return Result.success(list);
+    }
+
+    Dish dish = new Dish();
+    dish.setCategoryId(categoryId);
+    dish.setStatus(StatusConstant.ENABLE);//查询起售中的菜品
+
+    // 如果不存在, 查询数据库, 并将查询到的数据放入redis中
+    list = dishService.listWithFlavor(dish);
+    redisTemplate.opsForValue().set(key, list);
+
+    return Result.success(list);
+}
+```
+
+
+
+## 2.缓存套餐
+
+### 2.1 Spring Cache
+
+#### 2.1.1 介绍
+
+Spring Cache 是一个框架，实现了基于注解的缓存功能，只需要简单地加一个注解，就能实现缓存功能。
+
+Spring Cache 提供了一层抽象，底层可以切换不同的缓存实现，例如：
+
+- EHCache
+- Caffeine
+- Redis(常用)
+
+**起步依赖：**
+
+```xml
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-cache</artifactId>  		            		       	 <version>2.7.3</version> 
+</dependency>
+```
+
+
+
+#### 2.1.2 常用注解
+
+在SpringCache中提供了很多缓存操作的注解，常见的是以下的几个：
+
+| **注解**       | **说明**                                                     |
+| -------------- | ------------------------------------------------------------ |
+| @EnableCaching | 开启缓存注解功能，通常加在启动类上                           |
+| @Cacheable     | 在方法执行前先查询缓存中是否有数据，如果有数据，则直接返回缓存数据；如果没有缓存数据，调用方法并将方法返回值放到缓存中 |
+| @CachePut      | 将方法的返回值放到缓存中                                     |
+| @CacheEvict    | 将一条或多条数据从缓存中删除                                 |
+
+在spring boot项目中，使用缓存技术只需在项目中导入相关缓存技术的依赖包，并在启动类上使用@EnableCaching开启缓存支持即可。
+
+例如，使用Redis作为缓存技术，只需要导入Spring data Redis的maven坐标即可。
+
+
+
+#### 2.1.3 入门案例
+
+**1). 环境准备**
+
+**导入基础工程:**底层已使用Redis缓存实现 
+
  
+
+**数据库准备:**
+
+创建名为spring_cache_demo数据库，将springcachedemo.sql脚本直接导入数据库中。 
+
+
+
+**引导类上加@EnableCaching:**
+
+```java
+package com.itheima;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cache.annotation.EnableCaching;
+
+@Slf4j
+@SpringBootApplication
+@EnableCaching//开启缓存注解功能
+public class CacheDemoApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(CacheDemoApplication.class,args);
+        log.info("项目启动成功...");
+    }
+}
+```
+
+
+
+**2). @CachePut注解**
+
+**@CachePut 说明：** 
+
+​	作用: 将方法返回值，放入缓存
+
+​	value: 缓存的名称, 每个缓存名称下面可以有很多key
+
+​	key: 缓存的key  ----------> 支持Spring的表达式语言SPEL语法
+
+
+
+**在save方法上加注解@CachePut**
+
+当前UserController的save方法是用来保存用户信息的，我们希望在该用户信息保存到数据库的同时，也往缓存中缓存一份数据，我们可以在save方法上加上注解 @CachePut，用法如下：
+
+```java
+	/**
+	* CachePut：将方法返回值放入缓存
+	* value：缓存的名称，每个缓存名称下面可以有多个key
+	* key：缓存的key
+	*/
+	@PostMapping
+    @CachePut(value = "userCache", key = "#user.id")//key的生成：userCache::1
+    public User save(@RequestBody User user){
+        userMapper.insert(user);
+        return user;
+    }
+```
+
+**说明：**key的写法如下
+
+#user.id : #user指的是方法形参的名称, id指的是user的id属性 , 也就是使用user的id属性作为key ;
+
+#result.id : #result代表方法返回值，该表达式 代表以返回对象的id属性作为key ；
+
+#p0.id：#p0指的是方法中的第一个参数，id指的是第一个参数的id属性,也就是使用第一个参数的id属性作为key ;
+
+#a0.id：#a0指的是方法中的第一个参数，id指的是第一个参数的id属性,也就是使用第一个参数的id属性作为key ;
+
+#root.args[0].id:#root.args[0]指的是方法中的第一个参数，id指的是第一个参数的id属性,也就是使用第一个参数
+
+的id属性作为key ;
+
+**启动服务,通过swagger接口文档测试，访问UserController的save()方法**
+
+因为id是自增，所以不需要设置id属性
+
+**查看user表中的数据**
+
+**查看Redis中的数据**
+
+
+
+**3). @Cacheable注解**
+
+**@Cacheable 说明:**
+
+​	作用: 在方法执行前，spring先查看缓存中是否有数据，如果有数据，则直接返回缓存数据；若没有数据，调用方法并将方法返回值放到缓存中
+
+​	value: 缓存的名称，每个缓存名称下面可以有多个key
+
+​	key: 缓存的key  ----------> 支持Spring的表达式语言SPEL语法
+
+
+
+ **在getById上加注解@Cacheable**
+
+```java
+	/**
+	* Cacheable：在方法执行前spring先查看缓存中是否有数据，如果有数据，则直接返回缓存数据；若没有数据，	  *调用方法并将方法返回值放到缓存中
+	* value：缓存的名称，每个缓存名称下面可以有多个key
+	* key：缓存的key
+	*/
+	@GetMapping
+    @Cacheable(cacheNames = "userCache",key="#id")
+    public User getById(Long id){
+        User user = userMapper.getById(id);
+        return user;
+    }
+```
+
+**重启服务,通过swagger接口文档测试，访问UserController的getById()方法**
+
+第一次访问，会请求我们controller的方法，查询数据库。后面再查询相同的id，就直接从Redis中查询数据，不用再查询数据库了，就说明缓存生效了。
+
+提前在redis中手动删除掉id=1的用户数据 
+
+**查看控制台sql语句：**说明从数据库查询的用户数据 
+
+**查看Redis中的缓存数据：**说明已成功缓存 
+
+再次查询相同id的数据时，直接从redis中直接获取，不再查询数据库。
+
+
+
+**4). @CacheEvict注解**
+
+**@CacheEvict 说明：** 
+
+​	作用: 清理指定缓存
+
+​	value: 缓存的名称，每个缓存名称下面可以有多个key
+
+​	key: 缓存的key  ----------> 支持Spring的表达式语言SPEL语法
+
+
+
+**在 delete 方法上加注解@CacheEvict**
+
+```java
+	@DeleteMapping
+    @CacheEvict(cacheNames = "userCache",key = "#id")//删除某个key对应的缓存数据
+    public void deleteById(Long id){
+        userMapper.deleteById(id);
+    }
+
+	@DeleteMapping("/delAll")
+    @CacheEvict(cacheNames = "userCache",allEntries = true)//删除userCache下所有的缓存数据
+    public void deleteAll(){
+        userMapper.deleteAll();
+    }
+```
+
+**重启服务,通过swagger接口文档测试，访问UserController的deleteAll()方法**
+
+**查看user表：**数据清空 
+
+**查询Redis缓存数据**
+
+ 
+
+
+
+### 2.2 实现思路
+
+**实现步骤：**
+
+1). 导入Spring Cache和Redis相关maven坐标
+
+2). 在启动类上加入@EnableCaching注解，开启缓存注解功能
+
+3). 在用户端接口SetmealController的 list 方法上加入@Cacheable注解
+
+4). 在管理端接口SetmealController的 save、delete、update、startOrStop等方法上加入CacheEvict注解
+
+
+
+### 2.3 代码开发
+
+按照上述实现步骤：
+
+**1). 导入Spring Cache和Redis相关maven坐标(已实现)**
+
+```xml
+<dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+
+<dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-cache</artifactId>
+</dependency>
+```
+
+
+
+**2). 在启动类上加入@EnableCaching注解，开启缓存注解功能**
+
+```java
+package com.sky;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+
+@SpringBootApplication
+@EnableTransactionManagement //开启注解方式的事务管理
+@Slf4j
+@EnableCaching
+public class SkyApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(SkyApplication.class, args);
+        log.info("server started");
+    }
+}
+```
+
+
+
+**3). 在用户端接口SetmealController的 list 方法上加入@Cacheable注解**
+
+```java
+	/**
+     * 条件查询
+     *
+     * @param categoryId
+     * @return
+     */
+    @GetMapping("/list")
+    @ApiOperation("根据分类id查询套餐")
+    @Cacheable(cacheNames = "setmealCache",key = "#categoryId") //key: setmealCache::100
+    public Result<List<Setmeal>> list(Long categoryId) {
+        Setmeal setmeal = new Setmeal();
+        setmeal.setCategoryId(categoryId);
+        setmeal.setStatus(StatusConstant.ENABLE);
+
+        List<Setmeal> list = setmealService.list(setmeal);
+        return Result.success(list);
+    }
+```
+
+
+
+**4). 在管理端接口SetmealController的 save、delete、update、startOrStop等方法上加入CacheEvict注解**
+
+```java
+	/**
+     * 新增套餐
+     *
+     * @param setmealDTO
+     * @return
+     */
+    @PostMapping
+    @ApiOperation("新增套餐")
+    @CacheEvict(cacheNames = "setmealCache",key = "#setmealDTO.categoryId")//key: setmealCache::100
+    public Result save(@RequestBody SetmealDTO setmealDTO) {
+        setmealService.saveWithDish(setmealDTO);
+        return Result.success();
+    }
+	/**
+     * 批量删除套餐
+     *
+     * @param ids
+     * @return
+     */
+    @DeleteMapping
+    @ApiOperation("批量删除套餐")
+    @CacheEvict(cacheNames = "setmealCache",allEntries = true)
+    public Result delete(@RequestParam List<Long> ids) {
+        setmealService.deleteBatch(ids);
+        return Result.success();
+    }
+	/**
+     * 修改套餐
+     *
+     * @param setmealDTO
+     * @return
+     */
+    @PutMapping
+    @ApiOperation("修改套餐")
+    @CacheEvict(cacheNames = "setmealCache",allEntries = true)
+    public Result update(@RequestBody SetmealDTO setmealDTO) {
+        setmealService.update(setmealDTO);
+        return Result.success();
+    }
+
+    /**
+     * 套餐起售停售
+     *
+     * @param status
+     * @param id
+     * @return
+     */
+    @PostMapping("/status/{status}")
+    @ApiOperation("套餐起售停售")
+    @CacheEvict(cacheNames = "setmealCache",allEntries = true)
+    public Result startOrStop(@PathVariable Integer status, Long id) {
+        setmealService.startOrStop(status, id);
+        return Result.success();
+    }
+```
+
+
+
+## 3.添加购物车
+
+## 4.查看购物车
+
+##  5.清空购物车
+
+## 6.删除购物车内一个商品
 
