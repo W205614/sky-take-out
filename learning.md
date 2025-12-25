@@ -1,3 +1,5 @@
+
+
 **苍穹外卖**
 
 # 一. 项目概述
@@ -5665,11 +5667,412 @@ public class SkyApplication {
 
 
 
-## 3.添加购物车
+## 3. 添加购物车
 
-## 4.查看购物车
+### 3.1 需求分析和设计
 
-##  5.清空购物车
+#### 3.1.1 产品原型
 
-## 6.删除购物车内一个商品
+用户可以将菜品或者套餐添加到购物车。对于菜品来说，如果设置了口味信息，则需要选择规格后才能加入购物车;对于套餐来说，可以直接点击+将当前套餐加入购物车。在购物车中可以修改菜品和套餐的数量，也可以清空购物车。
 
+ 
+
+#### 3.1.2 接口设计
+
+**基本信息:**
+
+​	path:  /user/shoppingCart/add
+
+​	Method:  POST
+
+**请求参数:**
+
+​	Body 参数  application/json
+
+​	dishFlavor  string  口味 可选
+
+​	dishId  integer <int64>  菜品id  可选
+
+​	setmealId  integer <int64>  套餐id  可选
+
+**说明：**添加购物车时，有可能添加菜品，也有可能添加套餐。故传入参数要么是菜品id，要么是套餐id。
+
+
+
+#### 3.1.3 表设计
+
+用户的购物车数据，也是需要保存在数据库中的，购物车对应的数据表为shopping_cart表，具体表结构如下：
+
+| **字段名**  | **数据类型**  | **说明**     | **备注** |
+| ----------- | ------------- | ------------ | -------- |
+| id          | bigint        | 主键         | 自增     |
+| name        | varchar(32)   | 商品名称     | 冗余字段 |
+| image       | varchar(255)  | 商品图片路径 | 冗余字段 |
+| user_id     | bigint        | 用户id       | 逻辑外键 |
+| dish_id     | bigint        | 菜品id       | 逻辑外键 |
+| setmeal_id  | bigint        | 套餐id       | 逻辑外键 |
+| dish_flavor | varchar(50)   | 菜品口味     |          |
+| number      | int           | 商品数量     |          |
+| amount      | decimal(10,2) | 商品单价     | 冗余字段 |
+| create_time | datetime      | 创建时间     |          |
+
+**说明：** 
+
+- 购物车数据是关联用户的，在表结构中，我们需要记录，每一个用户的购物车数据是哪些
+- 菜品列表展示出来的既有套餐，又有菜品，如果用户选择的是套餐，就保存套餐ID(setmeal_id)，如果用户选择的是菜品，就保存菜品ID(dish_id)
+- 对同一个菜品/套餐，如果选择多份不需要添加多条记录，增加数量number即可
+
+
+
+### 3.2 代码开发
+
+#### 3.2.1 ShoppingCartDTO
+
+```java
+@Data
+public class ShoppingCartDTO implements Serializable {
+
+    private Long dishId;
+    private Long setmealId;
+    private String dishFlavor;
+
+}
+```
+
+
+
+#### 3.2.2 ShoppingCartController
+
+```java
+@RestController
+@RequestMapping("/user/shoppingCart")
+@Slf4j
+@Api(tags = "C端购物车相关接口")
+public class ShoppingCartController {
+    @Autowired
+    private ShoppingCartService shoppingCartService;
+
+    /**
+     * 添加购物车
+     * @param shoppingCartDTO
+     * @return
+     */
+    @PostMapping("/add")
+    @ApiOperation("添加购物车")
+    public Result add(@RequestBody ShoppingCartDTO shoppingCartDTO) {
+        log.info("添加购物车, 商品信息为: {}", shoppingCartDTO);
+        shoppingCartService.addShoppingCart(shoppingCartDTO);
+        return Result.success();
+    }
+}
+```
+
+
+
+#### 3.2.3 ShoppingCartServiceImpl
+
+```java
+@Service
+@Slf4j
+public class ShoppingCartServiceImpl implements ShoppingCartService {
+    @Autowired
+    private ShoppingCartMapper shoppingCartMapper;
+    @Autowired
+    private DishMapper dishMapper;
+    @Autowired
+    private SetmealMapper setmealMapper;
+    /**
+     * 添加购物车
+     * @param shoppingCartDTO
+     */
+    @Override
+    public void addShoppingCart(ShoppingCartDTO shoppingCartDTO) {
+        //判断当前加入购物车的商品是否存在
+        ShoppingCart shoppingCart = new ShoppingCart();
+        BeanUtils.copyProperties(shoppingCartDTO,shoppingCart); //属性拷贝
+        Long userId = BaseContext.getCurrentId();  //拦截器获取到的用户id
+        shoppingCart.setUserId(userId);
+        List<ShoppingCart> list = shoppingCartMapper.list(shoppingCart);
+
+        //如果已经存在了，只需要将数量加一
+        if(list!=null&&list.size()>0){
+            //这里list要么没有数据，要么只有一条数据
+            ShoppingCart cart = list.get(0);
+            cart.setNumber(cart.getNumber()+1); //update shopping_cart set number=?where id=?
+            shoppingCartMapper.updateNumberById(cart);
+        }else {
+            //如果不存在，需要插入一条购物车数据
+            /**
+             * 判断这次添加到购物车的是菜品还是套餐
+             */
+            Long dishId = shoppingCartDTO.getDishId();
+            if(dishId!=null){
+                //本次添加是菜品
+                Dish dish = dishMapper.getById(dishId);
+                shoppingCart.setName(dish.getName());
+                shoppingCart.setImage(dish.getImage());
+                shoppingCart.setAmount(dish.getPrice());
+            }else{
+                //本次添加的是套餐
+                Long setmealId = shoppingCartDTO.getSetmealId();
+                Setmeal setmeal = setmealMapper.getById(setmealId);
+                shoppingCart.setName(setmeal.getName());
+                shoppingCart.setImage(setmeal.getImage());
+                shoppingCart.setAmount(setmeal.getPrice());
+            }
+            shoppingCart.setNumber(1);
+            shoppingCart.setCreateTime(LocalDateTime.now());
+            //统一插入数据
+            shoppingCartMapper.insert(shoppingCart);
+        }
+    }
+}
+```
+
+
+
+#### 3.2.4 ShoppingCartMapper
+
+```java
+@Mapper
+public interface ShoppingCartMapper {
+
+    /**
+     * 动态条件查询
+     * @param shoppingCart
+     * @return
+     */
+    List<ShoppingCart> list(ShoppingCart shoppingCart);
+
+
+    /**
+     * 根据id修改商品数量
+     * @param shoppingCart
+     */
+    @Update("update shopping_cart set number = #{number} where id = #{id}")
+    void updateNumberById(ShoppingCart shoppingCart);
+
+    /**
+     * 插入购物车数据
+     * @param shoppingCart
+     */
+    @Insert("insert into shopping_cart(name , user_id, dish_id, setmeal_id, dish_flavor, number, amount,image, create_time)" +
+            "values(#{name},#{userId},#{dishId},#{setmealId},#{dishFlavor},#{number},#{amount},#{image},#{createTime})")
+    void insert(ShoppingCart shoppingCart);
+}
+```
+
+
+
+#### 3.2.5 ShoppingCartMapper.xml
+
+```xml
+<select id="list" resultType="com.sky.entity.ShoppingCart">
+    select * from shopping_cart
+    <where>
+        <if test="userId != null">
+            and user_id = #{userId}
+        </if>
+        <if test="setmealId != null">
+            and setmeal_id = #{setmealId}
+        </if>
+        <if test="dishId != null">
+            and dish_id = #{dishId}
+        </if>
+        <if test="dishFlavor != null">
+            and dish_flavor = #{dishFlavor}
+        </if>
+    </where>
+</select>
+```
+
+
+
+## 4. 查看购物车
+
+### 4.1 需求分析和设计
+
+**基本信息:**
+
+​	path:  /user/shoppingCart/list
+
+​	Method:  GET
+
+
+
+### 4.2 代码开发
+
+#### 4.2.1 ShoppingCartController
+
+```java
+/**
+ * 查看购物车
+ * @return
+ */
+@GetMapping("/list")
+@ApiOperation("查看购物车")
+public Result<List<ShoppingCart>> list() {
+    List<ShoppingCart> list = shoppingCartService.showShoppingCart();
+    return Result.success(list);
+}
+```
+
+
+
+#### 4.2.2 ShoppingCartServiceImpl
+
+```java
+/**
+ * 查看购物车
+ * @return
+ */
+@Override
+public List<ShoppingCart> showShoppingCart() {
+    // 获取到当前微信用户的id
+    Long userId = BaseContext.getCurrentId();
+    ShoppingCart shoppingCart = ShoppingCart.builder()
+            .userId(userId)
+            .build();
+    List<ShoppingCart> list = shoppingCartMapper.list(shoppingCart);
+    return list;
+}
+```
+
+
+
+##  5. 清空购物车
+
+### 5.1 需求分析和设计
+
+**基本信息:**
+
+​	path:  /user/shoppingCart/clean
+
+​	Method:  DELETE
+
+
+
+### 5.2 代码开发
+
+#### 5.2.1 ShoppingCartController
+
+```java
+/**
+ * 清空购物车
+ * @return
+ */
+@DeleteMapping("/clean")
+@ApiOperation("清空购物车")
+public Result clean() {
+    shoppingCartService.cleanShoppingCart();
+    return Result.success();
+}
+```
+
+
+
+#### 5.2.2 ShoppingCartServiceImpl
+
+```java
+/**
+ * 清空购物车
+ */
+@Override
+public void cleanShoppingCart() {
+    // 获取到当前微信用户的id
+    Long userId = BaseContext.getCurrentId();
+    shoppingCartMapper.deleteByUserId(userId);
+}
+```
+
+
+
+#### 5.2.3 ShoppingCartMapper
+
+```java
+/**
+ * 根据userId清空购物车
+ * @param userId
+ */
+@Delete("delete from shopping_cart where user_id = #{userId}")
+void deleteByUserId(Long userId);
+```
+
+
+
+## 6. 删除购物车内一个商品
+
+### 6.1 需求分析和设计
+
+**基本信息:**
+
+​	path:  /user/shoppingCart/sub
+
+​	Method:  POST
+
+
+
+### 6.2 代码开发
+
+#### 6.2.1 ShoppingCartController
+
+```java
+/**
+ * 删除购物车中一个商品
+ * @param shoppingCartDTO
+ * @return
+ */
+@PostMapping("/sub")
+@ApiOperation("删除购物车中一个商品")
+public Result sub(@RequestBody ShoppingCartDTO shoppingCartDTO){
+    log.info("删除购物车中一个商品，商品：{}", shoppingCartDTO);
+    shoppingCartService.subShoppingCart(shoppingCartDTO);
+    return Result.success();
+}
+```
+
+
+
+#### 6.2.2 ShoppingCartServiceImpl
+
+```java
+/**
+ * 删除购物车中一个商品
+ * @param shoppingCartDTO
+ */
+public void subShoppingCart(ShoppingCartDTO shoppingCartDTO) {
+    ShoppingCart shoppingCart = new ShoppingCart();
+    BeanUtils.copyProperties(shoppingCartDTO,shoppingCart);
+    //设置查询条件，查询当前登录用户的购物车数据
+    shoppingCart.setUserId(BaseContext.getCurrentId());
+
+    List<ShoppingCart> list = shoppingCartMapper.list(shoppingCart);
+
+    if(list != null && list.size() > 0){
+        shoppingCart = list.get(0);
+
+        Integer number = shoppingCart.getNumber();
+        if(number == 1){
+            //当前商品在购物车中的份数为1，直接删除当前记录
+            shoppingCartMapper.deleteById(shoppingCart.getId());
+        }else {
+            //当前商品在购物车中的份数不为1，修改份数即可
+            shoppingCart.setNumber(shoppingCart.getNumber() - 1);
+            shoppingCartMapper.updateNumberById(shoppingCart);
+        }
+    }
+}
+```
+
+
+
+#### 6.2.3 ShoppingCartMapper
+
+```java
+/**
+ * 根据id删除购物车数据
+ * @param id
+ */
+@Delete("delete from shopping_cart where id = #{id}")
+void deleteById(Long id);
+```
