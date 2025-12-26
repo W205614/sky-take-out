@@ -5310,7 +5310,7 @@ public Result<List<DishVO>> list(Long categoryId) {
 
 
 
-## 2.缓存套餐
+## 2. 缓存套餐
 
 ### 2.1 Spring Cache
 
@@ -6075,4 +6075,966 @@ public void subShoppingCart(ShoppingCartDTO shoppingCartDTO) {
  */
 @Delete("delete from shopping_cart where id = #{id}")
 void deleteById(Long id);
+```
+
+
+
+# 九. 地址簿, 用户下单及订单支付
+
+## 1. 地址簿模块
+
+### 1.1 需求分析和设计
+
+#### 1.1.1 产品原型
+
+地址簿，指的是消费者用户的地址信息，用户登录成功后可以维护自己的地址信息。同一个用户可以有多个地址信息，但是只能有一个**默认地址**。
+
+​             
+
+对于地址簿管理，我们需要实现以下几个功能： 
+
+- 查询地址列表
+- 新增地址
+- 修改地址
+- 删除地址
+- 设置默认地址
+- 查询默认地址
+
+
+
+#### 1.1.2 表设计
+
+用户的地址信息会存储在address_book表，即地址簿表中。具体表结构如下：
+
+| **字段名**    | **数据类型** | **说明**     | **备注**       |
+| ------------- | ------------ | ------------ | -------------- |
+| id            | bigint       | 主键         | 自增           |
+| user_id       | bigint       | 用户id       | 逻辑外键       |
+| consignee     | varchar(50)  | 收货人       |                |
+| sex           | varchar(2)   | 性别         |                |
+| phone         | varchar(11)  | 手机号       |                |
+| province_code | varchar(12)  | 省份编码     |                |
+| province_name | varchar(32)  | 省份名称     |                |
+| city_code     | varchar(12)  | 城市编码     |                |
+| city_name     | varchar(32)  | 城市名称     |                |
+| district_code | varchar(12)  | 区县编码     |                |
+| district_name | varchar(32)  | 区县名称     |                |
+| detail        | varchar(200) | 详细地址信息 | 具体到门牌号   |
+| label         | varchar(100) | 标签         | 公司、家、学校 |
+| is_default    | tinyint(1)   | 是否默认地址 | 1是 0否        |
+
+这里面有一个字段is_default，实际上我们在设置默认地址时，只需要更新这个字段就可以了。
+
+
+
+### 1.2 代码开发
+
+#### 1.2.1 AddressBookController
+
+```java
+@RestController
+@RequestMapping("/user/addressBook")
+@Api(tags = "C端地址簿接口")
+public class AddressBookController {
+
+    @Autowired
+    private AddressBookService addressBookService;
+
+    /**
+     * 查询当前登录用户的所有地址信息
+     *
+     * @return
+     */
+    @GetMapping("/list")
+    @ApiOperation("查询当前登录用户的所有地址信息")
+    public Result<List<AddressBook>> list() {
+        AddressBook addressBook = new AddressBook();
+        addressBook.setUserId(BaseContext.getCurrentId());
+        List<AddressBook> list = addressBookService.list(addressBook);
+        return Result.success(list);
+    }
+
+    /**
+     * 新增地址
+     *
+     * @param addressBook
+     * @return
+     */
+    @PostMapping
+    @ApiOperation("新增地址")
+    public Result save(@RequestBody AddressBook addressBook) {
+        addressBookService.save(addressBook);
+        return Result.success();
+    }
+
+    @GetMapping("/{id}")
+    @ApiOperation("根据id查询地址")
+    public Result<AddressBook> getById(@PathVariable Long id) {
+        AddressBook addressBook = addressBookService.getById(id);
+        return Result.success(addressBook);
+    }
+
+    /**
+     * 根据id修改地址
+     *
+     * @param addressBook
+     * @return
+     */
+    @PutMapping
+    @ApiOperation("根据id修改地址")
+    public Result update(@RequestBody AddressBook addressBook) {
+        addressBookService.update(addressBook);
+        return Result.success();
+    }
+
+    /**
+     * 设置默认地址
+     *
+     * @param addressBook
+     * @return
+     */
+    @PutMapping("/default")
+    @ApiOperation("设置默认地址")
+    public Result setDefault(@RequestBody AddressBook addressBook) {
+        addressBookService.setDefault(addressBook);
+        return Result.success();
+    }
+
+    /**
+     * 根据id删除地址
+     *
+     * @param id
+     * @return
+     */
+    @DeleteMapping
+    @ApiOperation("根据id删除地址")
+    public Result deleteById(Long id) {
+        addressBookService.deleteById(id);
+        return Result.success();
+    }
+
+    /**
+     * 查询默认地址
+     */
+    @GetMapping("default")
+    @ApiOperation("查询默认地址")
+    public Result<AddressBook> getDefault() {
+        //SQL:select * from address_book where user_id = ? and is_default = 1
+        AddressBook addressBook = new AddressBook();
+        addressBook.setIsDefault(1);
+        addressBook.setUserId(BaseContext.getCurrentId());
+        List<AddressBook> list = addressBookService.list(addressBook);
+
+        if (list != null && list.size() == 1) {
+            return Result.success(list.get(0));
+        }
+
+        return Result.error("没有查询到默认地址");
+    }
+
+}
+```
+
+
+
+#### 1.2.2 AddressBookServiceImpl
+
+```java
+@Service
+@Slf4j
+public class AddressBookServiceImpl implements AddressBookService {
+    @Autowired
+    private AddressBookMapper addressBookMapper;
+
+    /**
+     * 条件查询
+     *
+     * @param addressBook
+     * @return
+     */
+    public List<AddressBook> list(AddressBook addressBook) {
+        return addressBookMapper.list(addressBook);
+    }
+
+    /**
+     * 新增地址
+     *
+     * @param addressBook
+     */
+    public void save(AddressBook addressBook) {
+        addressBook.setUserId(BaseContext.getCurrentId());
+        addressBook.setIsDefault(0);
+        addressBookMapper.insert(addressBook);
+    }
+
+    /**
+     * 根据id查询
+     *
+     * @param id
+     * @return
+     */
+    public AddressBook getById(Long id) {
+        AddressBook addressBook = addressBookMapper.getById(id);
+        return addressBook;
+    }
+
+    /**
+     * 根据id修改地址
+     *
+     * @param addressBook
+     */
+    public void update(AddressBook addressBook) {
+        addressBookMapper.update(addressBook);
+    }
+
+    /**
+     * 设置默认地址
+     *
+     * @param addressBook
+     */
+    @Transactional
+    public void setDefault(AddressBook addressBook) {
+        //1、将当前用户的所有地址修改为非默认地址 update address_book set is_default = ? where user_id = ?
+        addressBook.setIsDefault(0);
+        addressBook.setUserId(BaseContext.getCurrentId());
+        addressBookMapper.updateIsDefaultByUserId(addressBook);
+
+        //2、将当前地址改为默认地址 update address_book set is_default = ? where id = ?
+        addressBook.setIsDefault(1);
+        addressBookMapper.update(addressBook);
+    }
+
+    /**
+     * 根据id删除地址
+     *
+     * @param id
+     */
+    public void deleteById(Long id) {
+        addressBookMapper.deleteById(id);
+    }
+
+}
+```
+
+
+
+#### 1.2.3 AddressBookMapper
+
+```java
+@Mapper
+public interface AddressBookMapper {
+
+    /**
+     * 条件查询
+     * @param addressBook
+     * @return
+     */
+    List<AddressBook> list(AddressBook addressBook);
+
+    /**
+     * 新增
+     * @param addressBook
+     */
+    @Insert("insert into address_book" +
+            "        (user_id, consignee, phone, sex, province_code, province_name, city_code, city_name, district_code," +
+            "         district_name, detail, label, is_default)" +
+            "        values (#{userId}, #{consignee}, #{phone}, #{sex}, #{provinceCode}, #{provinceName}, #{cityCode}, #{cityName}," +
+            "                #{districtCode}, #{districtName}, #{detail}, #{label}, #{isDefault})")
+    void insert(AddressBook addressBook);
+
+    /**
+     * 根据id查询
+     * @param id
+     * @return
+     */
+    @Select("select * from address_book where id = #{id}")
+    AddressBook getById(Long id);
+
+    /**
+     * 根据id修改
+     * @param addressBook
+     */
+    void update(AddressBook addressBook);
+
+    /**
+     * 根据 用户id修改 是否默认地址
+     * @param addressBook
+     */
+    @Update("update address_book set is_default = #{isDefault} where user_id = #{userId}")
+    void updateIsDefaultByUserId(AddressBook addressBook);
+
+    /**
+     * 根据id删除地址
+     * @param id
+     */
+    @Delete("delete from address_book where id = #{id}")
+    void deleteById(Long id);
+
+}
+```
+
+
+
+#### 1.2.4 AddressBookMapper.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.sky.mapper.AddressBookMapper">
+
+    <select id="list" parameterType="AddressBook" resultType="AddressBook">
+        select * from address_book
+        <where>
+            <if test="userId != null">
+                and user_id = #{userId}
+            </if>
+            <if test="phone != null">
+                and phone = #{phone}
+            </if>
+            <if test="isDefault != null">
+                and is_default = #{isDefault}
+            </if>
+        </where>
+    </select>
+
+    <update id="update" parameterType="addressBook">
+        update address_book
+        <set>
+            <if test="consignee != null">
+                consignee = #{consignee},
+            </if>
+            <if test="sex != null">
+                sex = #{sex},
+            </if>
+            <if test="phone != null">
+                phone = #{phone},
+            </if>
+            <if test="detail != null">
+                detail = #{detail},
+            </if>
+            <if test="label != null">
+                label = #{label},
+            </if>
+            <if test="isDefault != null">
+                is_default = #{isDefault},
+            </if>
+        </set>
+        where id = #{id}
+    </update>
+
+</mapper>
+```
+
+
+
+## 2. 用户下单
+
+### 2.1 需求分析和设计
+
+#### 2.1.1 产品原型
+
+**用户下单业务说明：**
+在电商系统中，用户是通过下单的方式通知商家，用户已经购买了商品，需要商家进行备货和发货。
+用户下单后会产生订单相关数据，订单数据需要能够体现如下信息：
+
+买的哪些商品?商品数量?订单总金额?哪个用户?收货地址?用户手机号? 
+
+用户将菜品或者套餐加入购物车后，可以点击购物车中的 "去结算" 按钮，页面跳转到订单确认页面，点击 "去支付" 按钮则完成下单操作
+
+
+
+#### 2.1.2 接口设计
+
+**基本信息:**
+
+​	path:  /user/order/submit
+
+​	Method:  POST
+
+**请求参数**:  application/json
+
+| 名称                  | 类型    | 是否必须 | 默认值 | 备注                                    | 其他信息 |
+| --------------------- | ------- | -------- | ------ | --------------------------------------- | -------- |
+| addressBookId         | integer | 必须     |        | 地址簿id                                | <int64>  |
+| amount                | number  | 必须     |        | 总金额                                  |          |
+| deliveryStatus        | integer | 必须     |        | 配送状态  1立即送出 0选择具体送出时间   | <int32>  |
+| estimatedDeliveryTime | string  | 必须     |        | 预计送达时间                            |          |
+| packAmount            | integer | 必须     |        | 打包费                                  | <int32>  |
+| payMethod             | integer | 必须     |        | 付款方式                                |          |
+| remark                | string  | 必须     |        | 备注                                    |          |
+| tablewareNumber       | integer | 必须     |        | 餐具数量                                | <int32>  |
+| tablewareStatus       | integer | 必须     |        | 餐具数量状态  1按餐量提供 0选择具体数量 | <int32>  |
+
+
+
+#### 2.1.3 表设计
+
+用户下单业务对应的数据表为orders表和order_detail表(一对多关系,一个订单关联多个订单明细)：
+
+| 表名         | 含义       | 说明                                                         |
+| ------------ | ---------- | ------------------------------------------------------------ |
+| orders       | 订单表     | 主要存储订单的基本信息(如: 订单号、状态、金额、支付方式、下单用户、收件地址等) |
+| order_detail | 订单明细表 | 主要存储订单详情信息(如: 该订单关联的套餐及菜品的信息)       |
+
+具体的表结构如下: 
+
+**1). orders订单表**
+
+| **字段名**              | **数据类型**  | **说明**     | **备注**                                        |
+| ----------------------- | ------------- | ------------ | ----------------------------------------------- |
+| id                      | bigint        | 主键         | 自增                                            |
+| number                  | varchar(50)   | 订单号       |                                                 |
+| status                  | int           | 订单状态     | 1待付款 2待接单 3已接单 4派送中 5已完成 6已取消 |
+| user_id                 | bigint        | 用户id       | 逻辑外键                                        |
+| address_book_id         | bigint        | 地址id       | 逻辑外键                                        |
+| order_time              | datetime      | 下单时间     |                                                 |
+| checkout_time           | datetime      | 付款时间     |                                                 |
+| pay_method              | int           | 支付方式     | 1微信支付 2支付宝支付                           |
+| pay_status              | tinyint       | 支付状态     | 0未支付 1已支付 2退款                           |
+| amount                  | decimal(10,2) | 订单金额     |                                                 |
+| remark                  | varchar(100)  | 备注信息     |                                                 |
+| phone                   | varchar(11)   | 手机号       | 冗余字段                                        |
+| address                 | varchar(255)  | 详细地址信息 | 冗余字段                                        |
+| consignee               | varchar(32)   | 收货人       | 冗余字段                                        |
+| cancel_reason           | varchar(255)  | 订单取消原因 |                                                 |
+| rejection_reason        | varchar(255)  | 拒单原因     |                                                 |
+| cancel_time             | datetime      | 订单取消时间 |                                                 |
+| estimated_delivery_time | datetime      | 预计送达时间 |                                                 |
+| delivery_status         | tinyint       | 配送状态     | 1立即送出 0选择具体时间                         |
+| delivery_time           | datetime      | 送达时间     |                                                 |
+| pack_amount             | int           | 打包费       |                                                 |
+| tableware_number        | int           | 餐具数量     |                                                 |
+| tableware_status        | tinyint       | 餐具数量状态 | 1按餐量提供 0选择具体数量                       |
+
+
+
+**2). order_detail订单明细表**
+
+| **字段名**  | **数据类型**  | **说明**     | **备注** |
+| ----------- | ------------- | ------------ | -------- |
+| id          | bigint        | 主键         | 自增     |
+| name        | varchar(32)   | 商品名称     | 冗余字段 |
+| image       | varchar(255)  | 商品图片路径 | 冗余字段 |
+| order_id    | bigint        | 订单id       | 逻辑外键 |
+| dish_id     | bigint        | 菜品id       | 逻辑外键 |
+| setmeal_id  | bigint        | 套餐id       | 逻辑外键 |
+| dish_flavor | varchar(50)   | 菜品口味     |          |
+| number      | int           | 商品数量     |          |
+| amount      | decimal(10,2) | 商品单价     |          |
+
+**说明：**用户提交订单时，需要往订单表orders中插入一条记录，并且需要往order_detail中插入一条或多条记录。
+
+
+
+### 2.2 代码开发
+
+#### 2.2.1 DTO设计
+
+**根据用户下单接口的参数设计DTO：** 
+
+在sky-pojo模块，OrdersSubmitDTO.java已定义
+
+```java
+package com.sky.dto;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import lombok.Data;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Data
+public class OrdersSubmitDTO implements Serializable {
+    //地址簿id
+    private Long addressBookId;
+    //付款方式
+    private int payMethod;
+    //备注
+    private String remark;
+    //预计送达时间
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime estimatedDeliveryTime;
+    //配送状态  1立即送出  0选择具体时间
+    private Integer deliveryStatus;
+    //餐具数量
+    private Integer tablewareNumber;
+    //餐具数量状态  1按餐量提供  0选择具体数量
+    private Integer tablewareStatus;
+    //打包费
+    private Integer packAmount;
+    //总金额
+    private BigDecimal amount;
+}
+```
+
+
+
+#### 2.2.2 VO设计
+
+**根据用户下单接口的返回结果设计VO：** 
+
+在sky-pojo模块，OrderSubmitVO.java已定义
+
+```java
+package com.sky.vo;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.io.Serializable;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class OrderSubmitVO implements Serializable {
+    //订单id
+    private Long id;
+    //订单号
+    private String orderNumber;
+    //订单金额
+    private BigDecimal orderAmount;
+    //下单时间
+    private LocalDateTime orderTime;
+}
+```
+
+
+
+#### 2.2.3 OrderController
+
+```java
+@RestController("userOrderController")
+@RequestMapping("/user/order")
+@Api(tags = "用户端订单相关接口")
+@Slf4j
+public class OrderController {
+    @Autowired
+    private OrderService orderService;
+
+    /**
+     * 用户下单
+     * @param ordersSubmitDTO
+     * @return
+     */
+    @PostMapping("/submit")
+    @ApiOperation("用户下单")
+    public Result<OrderSubmitVO> submit(@RequestBody OrdersSubmitDTO ordersSubmitDTO) {
+        log.info("用户下单: 参数为: {}", ordersSubmitDTO);
+        OrderSubmitVO orderSubmitVO = orderService.submitOrder(ordersSubmitDTO);
+        return Result.success(orderSubmitVO);
+    }
+}
+```
+
+
+
+#### 2.2.4 OrderServiceImpl
+
+```java
+@Service
+@Slf4j
+public class OrderServiceImpl implements OrderService {
+    @Autowired
+    private OrderMapper orderMapper;
+    @Autowired
+    private OrderDetailMapper orderDetailMapper;
+    @Autowired
+    private AddressBookMapper addressBookMapper;
+    @Autowired
+    private ShoppingCartMapper shoppingCartMapper;
+
+    /**
+     * 用户下单
+     * @param ordersSubmitDTO
+     * @return
+     */
+    @Transactional
+    @Override
+    public OrderSubmitVO submitOrder(OrdersSubmitDTO ordersSubmitDTO) {
+        // 处理各种业务异常(地址簿为空, 购物车数据为空)
+        AddressBook addressBook = addressBookMapper.getById(ordersSubmitDTO.getAddressBookId());
+        if(addressBook == null) {
+            throw new AddressBookBusinessException(MessageConstant.ADDRESS_BOOK_IS_NULL);
+        }
+
+        // 查询当前用户的购物车数据
+        Long userId = BaseContext.getCurrentId();
+        ShoppingCart shoppingCart = new ShoppingCart();
+        shoppingCart.setUserId(userId);
+        List<ShoppingCart> shoppingCartList = shoppingCartMapper.list(shoppingCart);
+
+        if(shoppingCartList == null || shoppingCartList.size() == 0) {
+            throw new ShoppingCartBusinessException(MessageConstant.SHOPPING_CART_IS_NULL);
+        }
+
+        // 向订单表插入1条数据
+        Orders orders = new Orders();
+        BeanUtils.copyProperties(ordersSubmitDTO, orders);
+        orders.setOrderTime(LocalDateTime.now());
+        orders.setPayStatus(Orders.UN_PAID);
+        orders.setStatus(Orders.PENDING_PAYMENT);
+        orders.setNumber(String.valueOf(System.currentTimeMillis()));
+        orders.setPhone(addressBook.getPhone());
+        orders.setConsignee(addressBook.getConsignee());
+        orders.setUserId(userId);
+
+        orderMapper.insert(orders);
+
+        // 向订单明细表插入n条数据
+        List<OrderDetail> orderDetailList = new ArrayList<>();
+        for(ShoppingCart cart : shoppingCartList) {
+            OrderDetail orderDetail = new OrderDetail(); // 订单明细
+            BeanUtils.copyProperties(cart, orderDetail);
+            orderDetail.setOrderId(orders.getId()); // 设置当前订单明细关联的订单id
+            orderDetailList.add(orderDetail);
+        }
+
+        orderDetailMapper.insertBatch(orderDetailList);
+
+        // 清空当前用户的购物车数据
+        shoppingCartMapper.deleteByUserId(userId);
+
+        // 封装VO返回结果
+        OrderSubmitVO orderSubmitVO = OrderSubmitVO.builder()
+                .id(orders.getId())
+                .orderTime(orders.getOrderTime())
+                .orderNumber(orders.getNumber())
+                .orderAmount(orders.getAmount())
+                .build();
+        return orderSubmitVO;
+    }
+}
+```
+
+
+
+#### 2.2.5 OrderMapper
+
+```java
+@Mapper
+public interface OrderMapper {
+    /**
+     * 向订单表插入数据
+     * @param orders
+     */
+    void insert(Orders orders);
+}
+```
+
+
+
+#### 2.2.6 OrderMapper.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.sky.mapper.OrderMapper">
+
+    <insert id="insert" parameterType="Orders" useGeneratedKeys="true" keyProperty="id">
+        insert into orders(number, status, user_id, address_book_id, order_time, checkout_time, pay_method, pay_status,
+                           amount, remark, phone, address, consignee, estimated_delivery_time, delivery_status,
+                           pack_amount, tableware_number, tableware_status)
+        values
+                (#{number}, #{status}, #{userId}, #{addressBookId}, #{orderTime}, #{checkoutTime}, #{payMethod},
+                #{payStatus}, #{amount}, #{remark}, #{phone}, #{address}, #{consignee}, #{estimatedDeliveryTime},
+                #{deliveryStatus}, #{packAmount}, #{tablewareNumber}, #{tablewareStatus})
+    </insert>
+
+</mapper>
+```
+
+
+
+#### 2.2.7 OrderDetailMapper
+
+```java
+@Mapper
+public interface OrderDetailMapper {
+    /**
+     * 批量插入订单明细表数据
+     * @param orderDetailList
+     */
+    void insertBatch(List<OrderDetail> orderDetailList);
+}
+```
+
+
+
+#### 2.2.8 OrderDetailMapper.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.sky.mapper.OrderDetailMapper">
+
+    <insert id="insertBatch" parameterType="list">
+        insert into order_detail
+            (name, order_id, dish_id, setmeal_id, dish_flavor, number, amount, image)
+        values
+        <foreach collection="orderDetailList" item="od" separator=",">
+            (#{od.name},#{od.orderId},#{od.dishId},#{od.setmealId},#{od.dishFlavor},
+            #{od.number},#{od.amount},#{od.image})
+        </foreach>
+    </insert>
+
+</mapper>
+```
+
+
+
+## 3. 订单支付
+
+### 3.1 代码开发
+
+#### 3.1.1 OrderController
+
+```java
+/**
+ * 订单支付
+ *
+ * @param ordersPaymentDTO
+ * @return
+ */
+@PutMapping("/payment")
+@ApiOperation("订单支付")
+public Result<OrderPaymentVO> payment(@RequestBody OrdersPaymentDTO ordersPaymentDTO) throws Exception {
+    log.info("订单支付：{}", ordersPaymentDTO);
+    OrderPaymentVO orderPaymentVO = orderService.payment(ordersPaymentDTO);
+    log.info("生成预支付交易单：{}", orderPaymentVO);
+    return Result.success(orderPaymentVO);
+}
+```
+
+
+
+#### 3.1.2 OrderServiceImpl
+
+```java
+ /**
+     * 订单支付
+     * @param ordersPaymentDTO
+     * @return
+     */
+    public OrderPaymentVO payment(OrdersPaymentDTO ordersPaymentDTO) throws Exception {
+        // 当前登录用户id
+        Long userId = BaseContext.getCurrentId();
+        User user = userMapper.getById(userId);
+/*        //调用微信支付接口，生成预支付交易单
+        JSONObject jsonObject = weChatPayUtil.pay(
+                ordersPaymentDTO.getOrderNumber(), //商户订单号
+                new BigDecimal(0.01), //支付金额，单位 元
+                "苍穹外卖订单", //商品描述
+                user.getOpenid() //微信用户的openid
+        );
+
+        if (jsonObject.getString("code") != null && jsonObject.getString("code").equals("ORDERPAID")) {
+            throw new OrderBusinessException("该订单已支付");
+        }
+*/
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("code","ORDERPAID");
+        OrderPaymentVO vo = jsonObject.toJavaObject(OrderPaymentVO.class);
+        vo.setPackageStr(jsonObject.getString("package"));
+        Integer OrderPaidStatus = Orders.PAID;//支付状态，已支付
+        Integer OrderStatus = Orders.TO_BE_CONFIRMED;  //订单状态，待接单
+        LocalDateTime check_out_time = LocalDateTime.now();//更新支付时间
+        orderMapper.updateStatus(OrderStatus, OrderPaidStatus, check_out_time, this.orders.getId());
+        return vo;
+    }
+
+    /**
+     * 支付成功，修改订单状态
+     *
+     * @param outTradeNo
+     */
+    public void paySuccess(String outTradeNo) {
+
+        // 根据订单号查询订单
+        Orders ordersDB = orderMapper.getByNumber(outTradeNo);
+
+        // 根据订单id更新订单的状态、支付方式、支付状态、结账时间
+        Orders orders = Orders.builder()
+                .id(ordersDB.getId())
+                .status(Orders.TO_BE_CONFIRMED)
+                .payStatus(Orders.PAID)
+                .checkoutTime(LocalDateTime.now())
+                .build();
+
+        orderMapper.update(orders);
+    }
+```
+
+
+
+#### 3.1.3 OrderMapper
+
+```java
+/**
+ * 根据订单号查询订单
+ * @param orderNumber
+ */
+@Select("select * from orders where number = #{orderNumber}")
+Orders getByNumber(String orderNumber);
+
+/**
+ * 修改订单信息
+ * @param orders
+ */
+void update(Orders orders);
+
+/**
+ * 修改订单状态
+ * @param orderStatus
+ * @param orderPaidStatus
+ * @param check_out_time
+ * @param id
+ */
+@Update("update orders set status = #{orderStatus},pay_status = #{orderPaidStatus} ,checkout_time = #{check_out_time} where id = #{id}")
+void updateStatus(Integer orderStatus, Integer orderPaidStatus, LocalDateTime check_out_time, Long id);
+```
+
+
+
+#### 3.1.4 OrderMapper.xml
+
+```xml
+<update id="update" parameterType="com.sky.entity.Orders">
+    update orders
+    <set>
+        <if test="cancelReason != null and cancelReason!='' ">
+            cancel_reason=#{cancelReason},
+        </if>
+        <if test="rejectionReason != null and rejectionReason!='' ">
+            rejection_reason=#{rejectionReason},
+        </if>
+        <if test="cancelTime != null">
+            cancel_time=#{cancelTime},
+        </if>
+        <if test="payStatus != null">
+            pay_status=#{payStatus},
+        </if>
+        <if test="payMethod != null">
+            pay_method=#{payMethod},
+        </if>
+        <if test="checkoutTime != null">
+            checkout_time=#{checkoutTime},
+        </if>
+        <if test="status != null">
+            status = #{status},
+        </if>
+        <if test="deliveryTime != null">
+            delivery_time = #{deliveryTime}
+        </if>
+    </set>
+    where id = #{id}
+</update>
+```
+
+
+
+#### 3.1.5 PayNotifyController
+
+```java
+/**
+ * 支付回调相关接口
+ */
+@RestController
+@RequestMapping("/notify")
+@Slf4j
+public class PayNotifyController {
+    @Autowired
+    private OrderService orderService;
+    @Autowired
+    private WeChatProperties weChatProperties;
+
+    /**
+     * 支付成功回调
+     *
+     * @param request
+     */
+    @RequestMapping("/paySuccess")
+    public void paySuccessNotify(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        //读取数据
+        String body = readData(request);
+        log.info("支付成功回调：{}", body);
+
+        //数据解密
+        String plainText = decryptData(body);
+        log.info("解密后的文本：{}", plainText);
+
+        JSONObject jsonObject = JSON.parseObject(plainText);
+        String outTradeNo = jsonObject.getString("out_trade_no");//商户平台订单号
+        String transactionId = jsonObject.getString("transaction_id");//微信支付交易号
+
+        log.info("商户平台订单号：{}", outTradeNo);
+        log.info("微信支付交易号：{}", transactionId);
+
+        //业务处理，修改订单状态、来单提醒
+        orderService.paySuccess(outTradeNo);
+
+        //给微信响应
+        responseToWeixin(response);
+    }
+
+    /**
+     * 读取数据
+     *
+     * @param request
+     * @return
+     * @throws Exception
+     */
+    private String readData(HttpServletRequest request) throws Exception {
+        BufferedReader reader = request.getReader();
+        StringBuilder result = new StringBuilder();
+        String line = null;
+        while ((line = reader.readLine()) != null) {
+            if (result.length() > 0) {
+                result.append("\n");
+            }
+            result.append(line);
+        }
+        return result.toString();
+    }
+
+    /**
+     * 数据解密
+     *
+     * @param body
+     * @return
+     * @throws Exception
+     */
+    private String decryptData(String body) throws Exception {
+        JSONObject resultObject = JSON.parseObject(body);
+        JSONObject resource = resultObject.getJSONObject("resource");
+        String ciphertext = resource.getString("ciphertext");
+        String nonce = resource.getString("nonce");
+        String associatedData = resource.getString("associated_data");
+
+        AesUtil aesUtil = new AesUtil(weChatProperties.getApiV3Key().getBytes(StandardCharsets.UTF_8));
+        //密文解密
+        String plainText = aesUtil.decryptToString(associatedData.getBytes(StandardCharsets.UTF_8),
+                nonce.getBytes(StandardCharsets.UTF_8),
+                ciphertext);
+
+        return plainText;
+    }
+
+    /**
+     * 给微信响应
+     * @param response
+     */
+    private void responseToWeixin(HttpServletResponse response) throws Exception{
+        response.setStatus(200);
+        HashMap<Object, Object> map = new HashMap<>();
+        map.put("code", "SUCCESS");
+        map.put("message", "SUCCESS");
+        response.setHeader("Content-type", ContentType.APPLICATION_JSON.toString());
+        response.getOutputStream().write(JSONUtils.toJSONString(map).getBytes(StandardCharsets.UTF_8));
+        response.flushBuffer();
+    }
+}
 ```
