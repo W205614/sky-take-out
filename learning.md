@@ -7038,3 +7038,457 @@ public class PayNotifyController {
     }
 }
 ```
+
+
+
+
+
+# 十. 用户端订单模块
+
+## 1. 查询历史订单
+
+### 1.1 需求分析和设计
+
+**业务规则:**
+
+​	1.分页查询历史订单
+
+​	2.可以根据订单状态查询
+
+​	3.展示订单数据时，需要展示的数据包括：下单时间、订单状态、订单金额、订单明细（商品名称、图片）
+
+**基本信息:**
+
+​	path:  /user/order/historyOrders
+
+​	Method:  GET
+
+**请求参数:** Query 参数
+
+​	page  string  页面  必需
+
+​	pageSize  string  每页记录数  必需
+
+​	status  string  订单状态  可选
+
+
+
+### 1.2 代码开发
+
+#### 1.2.1 OrderController
+
+```java
+/**
+ * 历史订单查询
+ * @param page
+ * @param pageSize
+ * @param status 订单状态 1待付款 2待接单 3已接单 4派送中 5已完成 6已取消
+ * @return
+ */
+@GetMapping("/historyOrders")
+@ApiOperation("历史订单查询")
+public Result<PageResult> page(int page, int pageSize, Integer status) {
+    log.info("查询历史订单, 参数为: {}, {}, {}", page, pageSize, status);
+    PageResult pageResult = orderService.pageQueryUser(page, pageSize, status);
+    return Result.success(pageResult);
+}
+```
+
+
+
+#### 1.2.2 OrderServiceImpl
+
+```java
+/**
+ * 用户端历史订单查询
+ * @param pageNum
+ * @param pageSize
+ * @param status
+ * @return
+ */
+@Override
+public PageResult pageQueryUser(int pageNum, int pageSize, Integer status) {
+    PageHelper.startPage(pageNum, pageSize);
+
+    OrdersPageQueryDTO ordersPageQueryDTO = new OrdersPageQueryDTO();
+    ordersPageQueryDTO.setUserId(BaseContext.getCurrentId());
+    ordersPageQueryDTO.setStatus(status);
+
+    // 分页条件查询
+    Page<Orders> page = orderMapper.pageQuery(ordersPageQueryDTO);
+    List<OrderVO> list = new ArrayList<>();
+
+    // 查询出订单明细, 封装到OrderVO响应
+    if(page != null && page.getTotal() > 0) {
+        for (Orders orders : page) {
+            Long orderId = orders.getId(); // 获取订单id
+
+            // 查询订单明细
+            List<OrderDetail> orderDetailList = orderDetailMapper.getByOrderId(orderId);
+
+            OrderVO orderVO = new OrderVO();
+            BeanUtils.copyProperties(orders, orderVO);
+            orderVO.setOrderDetailList(orderDetailList);
+
+            list.add(orderVO);
+        }
+    }
+    return new PageResult(page.getTotal(),list);
+}
+```
+
+
+
+#### 1.2.3 OrderMapper
+
+```java
+/**
+ * 分页条件查询并按下单时间排序
+ * @param ordersPageQueryDTO
+ * @return
+ */
+Page<Orders> pageQuery(OrdersPageQueryDTO ordersPageQueryDTO);
+```
+
+
+
+#### 1.2.4 OrderMapper.xml
+
+```xml
+<select id="pageQuery" resultType="com.sky.entity.Orders">
+    select * from orders
+    <where>
+        <if test = "number != null and number != ''">
+            and number like concat('%', #{number}, '%')
+        </if>
+        <if test = "phone != null and phone != ''">
+            and phone like concat('%', #{phone}, '%')
+        </if>
+        <if test = "userId != null">
+            and user_id = #{userId}
+        </if>
+        <if test = "status != null">
+            and status = #{status}
+        </if>
+        <if test = "beginTime != null">
+            and order_time &gt;= #{beginTime}
+        </if>
+        <if test = "endTime != null">
+            and order_time &lt;= #{endTime}
+        </if>
+    </where>
+    order by order_time desc
+</select>
+```
+
+
+
+#### 1.2.5 OrderDetailMapper
+
+```java
+/**
+ * 根据订单id查询订单明细
+ * @param orderId
+ * @return
+ */
+@Select("select * from order_detail where order_id = #{orderId}")
+List<OrderDetail> getByOrderId(Long orderId);
+```
+
+
+
+## 2. 查询订单详情
+
+### 2.1 需求分析和设计
+
+**基本信息:**
+
+​	path:  /user/order/orderDetail/{id}
+
+​	Method:  GET
+
+**请求参数**:  Path参数
+
+​	id  String  订单id  必需
+
+
+
+### 2.2 代码开发
+
+#### 2.2.1 OrderController
+
+```java
+/**
+ * 查询订单详情
+ * @param id
+ * @return
+ */
+@GetMapping("/orderDetail/{id}")
+@ApiOperation("查询订单详情")
+public Result<OrderVO> details(@PathVariable("id") Long id) {
+    log.info("查询订单详情, 订单id为: {}", id);
+    OrderVO orderVO = orderService.details(id);
+    return Result.success(orderVO);
+}
+```
+
+
+
+#### 2.2.2 OrderServiceImpl
+
+```java
+/**
+ * 查询订单详情
+ * @param id
+ * @return
+ */
+@Override
+public OrderVO details(Long id) {
+    // 根据id查询订单
+    Orders orders = orderMapper.getById(id);
+
+    // 查询订单对应的菜品或套餐明细
+    List<OrderDetail> orderDetailList = orderDetailMapper.getByOrderId(orders.getId());
+
+    // 将订单和详细信息封装到OrderVO返回
+    OrderVO orderVO = new OrderVO();
+    BeanUtils.copyProperties(orders, orderVO);
+    orderVO.setOrderDetailList(orderDetailList);
+
+    return orderVO;
+}
+```
+
+
+
+#### 2.2.3 OrderMapper
+
+```java
+/**
+ * 根据id查询订单
+ * @param id
+ * @return
+ */
+@Select("select * from orders where id = #{id}")
+Orders getById(Long id);
+```
+
+
+
+## 3. 取消订单
+
+### 3.1 需求分析和设计
+
+**业务规则：**
+
+​	1.待支付和待接单状态下，用户可直接取消订单
+
+​	2.商家已接单状态下，用户取消订单需电话沟通商家
+
+​	3.派送中状态下，用户取消订单需电话沟通商家
+
+​	4.如果在待接单状态下取消订单，需要给用户退款
+
+​	5.取消订单后需要将订单状态修改为“已取消”
+
+**基本信息:**
+
+​	path:  /user/order/cancel/{id}
+
+​	Method:  PUT
+
+**请求参数**:  Path参数
+
+​	id  String  订单id  必需
+
+
+
+### 3.2 代码开发
+
+#### 3.2.1 OrderController
+
+```java
+/**
+ * 取消订单
+ * @param id
+ * @return
+ */
+@PutMapping("/cancel/{id}")
+@ApiOperation("取消订单")
+public Result cancel(@PathVariable("id") Long id) throws Exception{
+    log.info("取消订单, 订单id为: {}", id);
+    orderService.userCancelById(id);
+    return Result.success();
+}
+```
+
+
+
+#### 3.2.2 OrderServiceImpl
+
+```java
+/**
+ * 取消订单
+ * @param id
+ */
+@Override
+public void userCancelById(Long id) throws Exception{
+    // 根据id查询订单
+    Orders ordersDB = orderMapper.getById(id);
+
+    // 校验订单是否存在
+    if(ordersDB == null) {
+        throw new OrderBusinessException(MessageConstant.ORDER_NOT_FOUND);
+    }
+
+    // 订单状态 1待付款 2待接单 3已接单 4派送中 5已完成 6已取消
+    if(ordersDB.getStatus() > 2) {
+        throw new OrderBusinessException(MessageConstant.ORDER_STATUS_ERROR);
+    }
+
+    Orders orders = new Orders();
+    orders.setId(ordersDB.getId());
+
+    // 订单处于待接单状态下取消, 需要进行退款
+    if(ordersDB.getStatus().equals(Orders.TO_BE_CONFIRMED)) {
+        // 调用微信支付退款接口
+        /*weChatPayUtil.refund(
+                ordersDB.getNumber(), // 商户订单号
+                ordersDB.getNumber(), // 商户退款单号
+                new BigDecimal(0.01), // 退款金额, 单位 元
+                new BigDecimal(0.01)); // 原订单金额*/
+
+        orders.setPayStatus(Orders.REFUND);
+    }
+
+    // 更新订单状态, 取消原因, 取消时间
+    orders.setStatus(Orders.CANCELLED);
+    orders.setCancelReason("用户取消");
+    orders.setCancelTime(LocalDateTime.now());
+    orderMapper.update(orders);
+}
+```
+
+
+
+## 4. 再来一单
+
+### 4.1 需求分析和设计
+
+**业务规则：**
+
+​	1.再来一单就是将原订单中的商品重新加入到购物车中
+
+**基本信息:**
+
+​	path:  /user/order/repetition/{id}
+
+​	Method:  POST
+
+**请求参数**:  Path参数
+
+​	id  string  订单id 
+
+
+
+### 4.2 代码开发
+
+#### 4.2.1 OrderController
+
+```java
+/**
+ * 再来一单
+ * @param id
+ * @return
+ */
+@PostMapping("/repetition/{id}")
+@ApiOperation("再来一单")
+public Result repetition(@PathVariable("id") Long id) {
+    log.info("再来一单, 订单id为: {}", id);
+    orderService.repetition(id);
+    return Result.success();
+}
+```
+
+
+
+#### 4.2.2 OrderServiceImpl
+
+```java
+/**
+ * 再来一单
+ * @param id
+ */
+@Override
+public void repetition(Long id) {
+    Long userId = BaseContext.getCurrentId();
+
+    // 根据id查询当前订单详情
+    List<OrderDetail> orderDetailList = orderDetailMapper.getByOrderId(id);
+
+    // 将订单详情对象转换为购物车对象
+    List<ShoppingCart> shoppingCartList = orderDetailList.stream().map(x -> {
+        ShoppingCart shoppingCart = new ShoppingCart();
+
+        // 将原订单详情里的菜品信息重新复制到购物车对象中
+        BeanUtils.copyProperties(x, shoppingCart, "id");
+        shoppingCart.setUserId(userId);
+        shoppingCart.setCreateTime(LocalDateTime.now());
+
+        return shoppingCart;
+    }).collect(Collectors.toList());
+
+    // 将购物车对象批量添加到数据库
+    shoppingCartMapper.insertBatch(shoppingCartList);
+}
+```
+
+
+
+#### 4.2.3 ShoppingCartMapper
+
+```java
+/**
+ * 批量添加购物车数据
+ * @param shoppingCartList
+ */
+void insertBatch(List<ShoppingCart> shoppingCartList);
+```
+
+
+
+#### 4.2.4 ShoppingCartMapper.xml
+
+```xml
+<insert id="insertBatch" parameterType="list">
+    insert into shopping_cart
+        (name, image, user_id, dish_id, setmeal_id, dish_flavor, number, amount, create_time)
+    values
+    <foreach collection="shoppingCartList" item="sc" separator=",">
+        (#{sc.name}, #{sc.image}, #{sc.userId}, #{sc.dishId}, #{sc.setmealId}, #{sc.dishFlavor},
+         #{sc.number}, #{sc.amount}, #{sc.createTime})
+    </foreach>
+</insert>
+```
+
+
+
+# 十一. 商家端订单管理模块
+
+## 1. 订单搜索
+
+## 2. 各个状态的订单数量统计
+
+## 3. 查询订单情况
+
+## 4. 接单
+
+## 5. 拒单
+
+## 6. 取消订单
+
+## 7. 派送订单
+
+## 8. 完成订单
+
+# 十二. 校验收货地址是否超出配送范围
