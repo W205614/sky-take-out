@@ -17,6 +17,7 @@ import com.sky.result.PageResult;
 import com.sky.service.OrderService;
 import com.sky.utils.WeChatPayUtil;
 import com.sky.vo.OrderPaymentVO;
+import com.sky.vo.OrderStatisticsVO;
 import com.sky.vo.OrderSubmitVO;
 import com.sky.vo.OrderVO;
 import lombok.extern.slf4j.Slf4j;
@@ -322,7 +323,7 @@ public class OrderServiceImpl implements OrderService {
                 String orderDishes = getOrderDishesStr(orders);
 
                 // 手动添加地址
-                orderVO.setAddress(getAddrass(orders.getAddressBookId()));
+                orderVO.setAddress(getAddress(orders.getAddressBookId()));
 
                 // 将订单菜品信息封装到orderVO中, 并添加到orderVOList
                 orderVO.setOrderDishes(orderDishes);
@@ -351,7 +352,7 @@ public class OrderServiceImpl implements OrderService {
         return String.join("", orderDishList);
     }
 
-    private String getAddrass(Long addressBookId){
+    private String getAddress(Long addressBookId){
         AddressBook addressBook = addressBookMapper.getById(addressBookId);
         if (addressBook == null) {
             return "";
@@ -359,5 +360,25 @@ public class OrderServiceImpl implements OrderService {
         String address = addressBook.getProvinceName() + addressBook.getCityName() +
                 addressBook.getDistrictName() + addressBook.getDetail();
         return address;
+    }
+
+    /**
+     * 各个状态的订单查询
+     * @return
+     */
+    @Override
+    public OrderStatisticsVO statistics() {
+        // 根据状态, 分别查询待接单, 待派送, 派送中的订单数量
+        // 订单状态 1待付款 2待接单 3已接单 4派送中 5已完成 6已取消
+        Integer toBeConfirmed = orderMapper.countStatus(Orders.TO_BE_CONFIRMED);
+        Integer confirmed = orderMapper.countStatus(Orders.CONFIRMED);
+        Integer deliveryInProgress = orderMapper.countStatus(Orders.DELIVERY_IN_PROGRESS);
+
+        // 将查询出的数据封装到orderStatisticsVO中响应
+        OrderStatisticsVO orderStatisticsVO = new OrderStatisticsVO();
+        orderStatisticsVO.setToBeConfirmed(toBeConfirmed);
+        orderStatisticsVO.setConfirmed(confirmed);
+        orderStatisticsVO.setDeliveryInProgress(deliveryInProgress);
+        return orderStatisticsVO;
     }
 }
