@@ -8954,3 +8954,707 @@ public void reminder(Long id) {
     webSocketServer.sendToAllClient(JSON.toJSONString(map));
 }
 ```
+
+
+
+# 十四. 数据统计-图形报表
+
+## 1. 营业额统计
+
+### 1.1 需求分析和设计
+
+#### 1.1.1 产品原型
+
+营业额统计是基于折现图来展现，并且按照天来展示的。实际上，就是某一个时间范围之内的每一天的营业额。同时，不管光标放在哪个点上，那么它就会把具体的数值展示出来。并且还需要注意日期并不是固定写死的，是由上边时间选择器来决定。比如选择是近7天、或者是近30日，或者是本周，就会把相应这个时间段之内的每一天日期通过横坐标展示。
+
+**业务规则：**
+
+- 营业额指订单状态为已完成的订单金额合计
+- 基于可视化报表的折线图展示营业额数据，X轴为日期，Y轴为营业额
+- 根据时间选择区间，展示每天的营业额数据
+
+
+
+#### 1.1.2 接口设计
+
+**基本信息:**
+
+​	path:   /admin/report/turnoverStatistics
+
+​	Method:  GET
+
+**请求参数**:  Query参数
+
+​	begin  string  开始日期
+
+​	end  string  结束日期
+
+**注意：**具体返回数据一般由前端来决定，前端展示图表，具体折现图对应数据是什么格式，是有固定的要求的。
+所以说，后端需要去适应前端，它需要什么格式的数据，我们就给它返回什么格式的数据。
+
+
+
+### 1.2 代码开发
+
+#### 1.2.1 TurnoverReportVO
+
+```java
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class TurnoverReportVO implements Serializable {
+
+    //日期，以逗号分隔，例如：2022-10-01,2022-10-02,2022-10-03
+    private String dateList;
+
+    //营业额，以逗号分隔，例如：406.0,1520.0,75.0
+    private String turnoverList;
+
+}
+```
+
+
+
+#### 1.2.2 ReportController
+
+```java
+/**
+ * 数据统计相关接口
+ */
+@RestController
+@RequestMapping("/admin/report")
+@Api(tags = "数据统计相关接口")
+@Slf4j
+public class ReportController {
+    @Autowired
+    private ReportService reportService;
+
+    /**
+     * 营业额统计
+     * @param begin
+     * @param end
+     * @return
+     */
+    @GetMapping("/turnoverStatistics")
+    @ApiOperation("营业额统计")
+    public Result<TurnoverReportVO> turnoverStatistics(
+            @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate begin,
+            @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate end) {
+        log.info("营业额数据统计: {}, {}", begin, end);
+        return Result.success(reportService.getTurnoverStatistics(begin, end));
+    }
+}
+```
+
+
+
+#### 1.2.3 ReportServiceImpl
+
+```java
+@Service
+@Slf4j
+public class ReportServiceImpl implements ReportService {
+    @Autowired
+    private OrderMapper orderMapper;
+
+    /**
+     * 统计指定区间内的营业额
+     * @param begin
+     * @param end
+     * @return
+     */
+    @Override
+    public TurnoverReportVO getTurnoverStatistics(LocalDate begin, LocalDate end) {
+        // 当前集合用于存放从begin到end范围内的每天的日期
+        List<LocalDate> dateList = new ArrayList<>();
+
+        dateList.add(begin);
+
+        while(!begin.equals(end)) {
+            // 日期计算, 计算指定日期的后一天对应的日期
+            begin = begin.plusDays(1);
+            dateList.add(begin);
+        }
+
+        // 存放每天的营业额
+        List<Double> turnoverList = new ArrayList<>();
+        for (LocalDate date : dateList) {
+            // 查询date日期对应的营业额数据, 指的是状态的已完成的订单金额总计
+            LocalDateTime beginTime = LocalDateTime.of(date, LocalTime.MIN);
+            LocalDateTime endTime = LocalDateTime.of(date, LocalTime.MAX);
+
+            Map map = new HashMap();
+            map.put("begin", beginTime);
+            map.put("end", endTime);
+            map.put("status", Orders.COMPLETED);
+            Double turnover = orderMapper.sumByMap(map);
+            turnover = turnover == null ? 0.0 : turnover;
+            turnoverList.add(turnover);
+        }
+
+        return TurnoverReportVO
+                .builder()
+                .dateList(StringUtils.join(dateList, ","))
+                .turnoverList(StringUtils.join(turnoverList, ","))
+                .build();
+    }
+}
+```
+
+
+
+#### 1.2.4 OrderMapper
+
+```java
+/**
+ * 查询指定日期的营业额
+ * @param map
+ * @return
+ */
+Double sumByMap(Map map);
+```
+
+
+
+#### 1.2.5 OrderMapper.xml
+
+```java
+<select id="sumByMap" resultType="java.lang.Double">
+    select sum(amount) from orders
+    <where>
+        <if test = "begin != null">
+            and order_time &gt; #{begin}
+        </if>
+        <if test = "end != null">
+            and order_time &lt; #{end}
+        </if>
+        <if test = "status != null">
+            and status = #{status}
+        </if>
+    </where>
+</select>
+```
+
+
+
+## 2. 用户统计
+
+### 2.1 需求分析和设计
+
+#### 2.1.1 产品原型
+
+所谓用户统计，实际上统计的是用户的数量。通过折线图来展示，上面这根蓝色线代表的是用户总量，下边这根绿色线代表的是新增用户数量，是具体到每一天。所以说用户统计主要统计**两个数据**，一个是**总的用户数量**，另外一个是**新增用户数量**。
+
+
+
+**业务规则：**
+
+- 基于可视化报表的折线图展示用户数据，X轴为日期，Y轴为用户数
+- 根据时间选择区间，展示每天的用户总量和新增用户量数据
+
+
+
+#### 2.1.2 接口设计
+
+**基本信息:**
+
+​	path:  /admin/report/userStatistics
+
+​	Method:  GET
+
+**请求参数**:  Query参数
+
+​	begin  string  开始日期
+
+​	end  string  结束日期
+
+
+
+### 2.2 代码开发
+
+#### 2.2.1 UserReportVO
+
+```java
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class UserReportVO implements Serializable {
+
+    //日期，以逗号分隔，例如：2022-10-01,2022-10-02,2022-10-03
+    private String dateList;
+
+    //用户总量，以逗号分隔，例如：200,210,220
+    private String totalUserList;
+
+    //新增用户，以逗号分隔，例如：20,21,10
+    private String newUserList;
+
+}
+```
+
+
+
+#### 2.2.2 ReportController
+
+```java
+/**
+ * 用户统计
+ * @param begin
+ * @param end
+ * @return
+ */
+@GetMapping("/userStatistics")
+@ApiOperation("用户统计")
+public Result<UserReportVO> userStatistics(
+        @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate begin,
+        @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate end) {
+    log.info("用户统计: {}, {}", begin, end);
+    return Result.success(reportService.getUserStatistics(begin, end));
+}
+```
+
+  
+
+#### 2.2.3 ReportServiceImpl
+
+```java
+/**
+ * 用户统计
+ * @param begin
+ * @param end
+ * @return
+ */
+@Override
+public UserReportVO getUserStatistics(LocalDate begin, LocalDate end) {
+    // 当前集合用于存放从begin到end范围内的每天的日期
+    List<LocalDate> dateList = new ArrayList<>();
+
+    dateList.add(begin);
+
+    while(!begin.equals(end)) {
+        // 日期计算, 计算指定日期的后一天对应的日期
+        begin = begin.plusDays(1);
+        dateList.add(begin);
+    }
+
+    // 存放每天的新增用户数量
+    List<Integer> newUserList = new ArrayList<>();
+    // 存放每天的总用户数量
+    List<Integer> totalUserList = new ArrayList<>();
+
+    for (LocalDate date : dateList) {
+        LocalDateTime beginTime = LocalDateTime.of(date, LocalTime.MIN);
+        LocalDateTime endTime = LocalDateTime.of(date, LocalTime.MAX);
+
+        Map map = new HashMap();
+        map.put("end", endTime);
+
+        // 总用户数量
+        Integer totalUser = userMapper.countByMap(map);
+
+        map.put("begin", beginTime);
+        // 新增用户
+        Integer newUser = userMapper.countByMap(map);
+
+        totalUserList.add(totalUser);
+        newUserList.add(newUser);
+    }
+
+    return UserReportVO
+            .builder()
+            .dateList(StringUtils.join(dateList, ","))
+            .totalUserList(StringUtils.join(totalUserList, ","))
+            .newUserList(StringUtils.join(newUserList, ","))
+            .build();
+}
+```
+
+
+
+#### 2.2.4 UserMapper
+
+```java
+/**
+ * 根据动态条件统计用户数据
+ * @param map
+ * @return
+ */
+Integer countByMap(Map map);
+```
+
+
+
+#### 2.2.5 UserMapper.xml
+
+```xml
+<select id="countByMap" resultType="java.lang.Integer">
+    select count(id) from user
+    <where>
+        <if test = "begin != null">
+            and create_time &gt; #{begin}
+        </if>
+        <if test = "end != null">
+            and create_time &lt; #{end}
+        </if>
+    </where>
+</select>
+```
+
+
+
+## 3. 订单统计
+
+### 3.1 需求分析和设计
+
+#### 3.1.1 产品原型
+
+订单统计通过一个折现图来展现，折线图上有两根线，这根蓝色的线代表的是订单总数，而下边这根绿色的线代表的是有效订单数，指的就是状态是已完成的订单就属于有效订单，分别反映的是每一天的数据。上面还有3个数字，分别是订单总数、有效订单、订单完成率，它指的是整个时间区间之内总的数据。
+
+
+
+**业务规则：**
+
+- 有效订单指状态为 “已完成” 的订单
+- 基于可视化报表的折线图展示订单数据，X轴为日期，Y轴为订单数量
+- 根据时间选择区间，展示每天的订单总数和有效订单数
+- 展示所选时间区间内的有效订单数、总订单数、订单完成率，订单完成率 = 有效订单数 / 总订单数 * 100%
+
+
+
+#### 3.1.2 接口设计
+
+**基本信息:**
+
+​	path:  /admin/report/ordersStatistics
+
+​	Method:  GET
+
+**请求参数**:  Query参数
+
+​	begin  string  开始日期
+
+​	end  string  结束日期
+
+
+
+### 3.2 代码开发
+
+#### 3.2.1 OrderReportVO
+
+```java
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class OrderReportVO implements Serializable {
+
+    //日期，以逗号分隔，例如：2022-10-01,2022-10-02,2022-10-03
+    private String dateList;
+
+    //每日订单数，以逗号分隔，例如：260,210,215
+    private String orderCountList;
+
+    //每日有效订单数，以逗号分隔，例如：20,21,10
+    private String validOrderCountList;
+
+    //订单总数
+    private Integer totalOrderCount;
+
+    //有效订单数
+    private Integer validOrderCount;
+
+    //订单完成率
+    private Double orderCompletionRate;
+
+}
+```
+
+ 
+
+#### 3.2.2 ReportController
+
+```java
+/**
+ * 订单统计
+ * @param begin
+ * @param end
+ * @return
+ */
+@GetMapping("/ordersStatistics")
+@ApiOperation("订单统计")
+public Result<OrderReportVO> orderStatistics(
+        @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate begin,
+        @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate end) {
+    log.info("订单数据统计: {}, {}", begin, end);
+    return Result.success(reportService.getOrderStatistics(begin, end));
+}
+```
+
+
+
+#### 3.2.3 ReportServiceImpl
+
+```java
+/**
+ * 统计指定区间内的订单数据
+ * @param begin
+ * @param end
+ * @return
+ */
+@Override
+public OrderReportVO getOrderStatistics(LocalDate begin, LocalDate end) {
+    // 当前集合用于存放从begin到end范围内的每天的日期
+    List<LocalDate> dateList = new ArrayList<>();
+
+    dateList.add(begin);
+
+    while(!begin.equals(end)) {
+        // 日期计算, 计算指定日期的后一天对应的日期
+        begin = begin.plusDays(1);
+        dateList.add(begin);
+    }
+
+    // 存放每日订单数
+    List<Integer> orderCountList = new ArrayList<>();
+    // 存放每日有效订单数
+    List<Integer> validOrderCountList = new ArrayList<>();
+
+    for (LocalDate date : dateList) {
+        LocalDateTime beginTime = LocalDateTime.of(date, LocalTime.MIN);
+        LocalDateTime endTime = LocalDateTime.of(date, LocalTime.MAX);
+
+        // 查询每天的订单总数
+        Integer orderCount = getOrderCount(beginTime, endTime, null);
+        // 查询每天的有效订单数
+        Integer validOrderCount = getOrderCount(beginTime, endTime, Orders.COMPLETED);
+
+        orderCountList.add(orderCount);
+        validOrderCountList.add(validOrderCount);
+    }
+
+    // 计算时间区间内的订单总数量
+    Integer totalOrderCount = orderCountList.stream().reduce(Integer::sum).get();
+    // 计算时间区间内的有效订单数量
+    Integer validOrderCount = validOrderCountList.stream().reduce(Integer::sum).get();
+    // 计算订单完成率
+    Double orderCompletionRate = 0.0;
+    if(totalOrderCount != 0) {
+        orderCompletionRate = validOrderCount.doubleValue() / totalOrderCount;
+    }
+    return OrderReportVO
+            .builder()
+            .dateList(StringUtils.join(dateList, ","))
+            .orderCountList(StringUtils.join(orderCountList, ","))
+            .validOrderCountList(StringUtils.join(validOrderCountList, ","))
+            .totalOrderCount(totalOrderCount)
+            .validOrderCount(validOrderCount)
+            .orderCompletionRate(orderCompletionRate)
+            .build();
+}
+
+private Integer getOrderCount(LocalDateTime begin, LocalDateTime end, Integer status) {
+    Map map = new HashMap();
+    map.put("begin", begin);
+    map.put("end", end);
+    map.put("status", status);
+
+    return orderMapper.countByMap(map);
+}
+```
+
+
+
+#### 3.2.4 OrderMapper
+
+```java
+/**
+ * 根据动态条件统计订单数量
+ * @param map
+ * @return
+ */
+Integer countByMap(Map map);
+```
+
+
+
+#### 3.2.5 OrderMapper.xml
+
+```java
+<select id="countByMap" resultType="java.lang.Integer">
+    select count(id) from orders
+    <where>
+        <if test = "begin != null">
+            and order_time &gt; #{begin}
+        </if>
+        <if test = "end != null">
+            and order_time &lt; #{end}
+        </if>
+        <if test = "status != null">
+            and status = #{status}
+        </if>
+    </where>
+</select>
+```
+
+
+
+## 4. 销量排名Top10
+
+### 4.1 需求分析和设计
+
+#### 4.1.1 产品原型
+
+所谓销量排名，销量指的是商品销售的数量。项目当中的商品主要包含两类：一个是**套餐**，一个是**菜品**，所以销量排名其实指的就是菜品和套餐销售的数量排名。通过柱形图来展示销量排名，这些销量是按照降序来排列，并且只需要统计销量排名前十的商品。
+
+ 
+
+**业务规则：**
+
+- 根据时间选择区间，展示销量前10的商品（包括菜品和套餐）
+- 基于可视化报表的柱状图降序展示商品销量
+- 此处的销量为商品销售的份数
+
+
+
+#### 4.1.2 接口设计
+
+**基本信息:**
+
+​	path:  /admin/report/top10
+
+​	Method:  GET
+
+**请求参数**:  Query参数
+
+​	begin  string  开始日期
+
+​	end  string  结束日期
+
+
+
+### 4.2 代码开发
+
+#### 4.2.1 SalesTop10ReportVO
+
+```java
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class SalesTop10ReportVO implements Serializable {
+
+    //商品名称列表，以逗号分隔，例如：鱼香肉丝,宫保鸡丁,水煮鱼
+    private String nameList;
+
+    //销量列表，以逗号分隔，例如：260,215,200
+    private String numberList;
+
+}
+```
+
+
+
+#### 4.2.2 GoodsSalesDTO
+
+```java
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+public class GoodsSalesDTO implements Serializable {
+    //商品名称
+    private String name;
+
+    //销量
+    private Integer number;
+}
+```
+
+
+
+#### 4.2.3 ReportController
+
+```java
+/**
+ * 销量排名top10
+ * @param begin
+ * @param end
+ * @return
+ */
+@GetMapping("/top10")
+@ApiOperation("销量排名top10")
+public Result<SalesTop10ReportVO> top10(
+        @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate begin,
+        @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate end) {
+    log.info("销量排名top10: {}, {}", begin, end);
+    return Result.success(reportService.getSalesTop10(begin, end));
+}
+```
+
+ 
+
+#### 4.2.4 ReportServiceImpl
+
+```java
+/**
+ * 指定区间内销量排名top10
+ * @param begin
+ * @param end
+ * @return
+ */
+@Override
+public SalesTop10ReportVO getSalesTop10(LocalDate begin, LocalDate end) {
+    LocalDateTime beginTime = LocalDateTime.of(begin, LocalTime.MIN);
+    LocalDateTime endTime = LocalDateTime.of(end, LocalTime.MAX);
+
+    List<GoodsSalesDTO> salesTop10 = orderMapper.getSalesTop10(beginTime, endTime);
+    List<String> names = salesTop10.stream().map(GoodsSalesDTO::getName).collect(Collectors.toList());
+    String nameList = StringUtils.join(names, ",");
+
+    List<Integer> numbers = salesTop10.stream().map(GoodsSalesDTO::getNumber).collect(Collectors.toList());
+    String numberList = StringUtils.join(numbers, ",");
+
+    return SalesTop10ReportVO
+            .builder()
+            .nameList(nameList)
+            .numberList(numberList)
+            .build();
+}
+```
+
+
+
+#### 4.2.5 OrderMapper
+
+```java
+/**
+ * 统计指定区间内的销量排名top10
+ * @param begin
+ * @param end
+ * @return
+ */
+List<GoodsSalesDTO> getSalesTop10(LocalDateTime begin, LocalDateTime end);
+```
+
+
+
+#### 4.2.6 OrderMapper.xml
+
+```java
+<select id="getSalesTop10" resultType="com.sky.dto.GoodsSalesDTO">
+    select od.name, sum(od.number) number
+    from order_detail od, orders o
+    where od.order_id = o.id and o.status = 5
+    <if test = "begin != null">
+        and o.order_time &gt; #{begin}
+    </if>
+    <if test = "end != null">
+        and o.order_time &lt; #{end}
+    </if>
+    group by od.name
+    order by number desc
+    limit 0,10
+</select>
+```
