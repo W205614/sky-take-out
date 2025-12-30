@@ -1,4 +1,4 @@
-
+java
 
 **苍穹外卖**
 
@@ -10359,5 +10359,605 @@ public void exportBusinessData(HttpServletResponse response) {
         e.printStackTrace();
     }
 
+}
+```
+
+
+
+# 十六. 项目开发过程技术的使用
+
+## 1. Redis
+
+### 1.1 Redis在项目中的作用
+
+Redis 是高性能的，基于键值对的，写入缓存的 内存存储系统。它支持多种数据结构如字符串、哈希表、列表、集合、有序集合等，并提供了丰富的操作命令。
+
+**项目中引入 Redis 的地方是：**
+
+查询店铺营业状态 像这种店铺营业状态，本项目无非就两个状态：营业中/打样。而且它属于高频查询。只要用户浏览到这个店铺，前端就要自动发送请求到后端查询店铺状态。Redis 是基于键值对这种形式存储的，而且 Redis 也把将数据放到缓存中，而不是磁盘，有效缓解了这种高频查询给磁盘带来的压力。
+		缓存菜品 用户端小程序展示的菜品数据都是通过查询数据库获得，如果用户端访问量比较大，数据库访问压力随之增大。结果：系统响应慢、用户体验差。通过Redis来缓存菜品数据，减少数据库查询操作
+
+
+
+### 1.2 redis的缓存原理，为什么速度快？
+
+1.Redis 将数据存储在内存中，相比于磁盘的数据库系统，内存存储具有更快的读写速度
+		2.Redis 使用单线程模型来处理客户端请求，避免了多线程并发导致的线程切换开销与竞争
+		3.Redis 内置了多种优化后的数据类型 / 结构实现，性能非常高
+		4.Redis 使用的是非阻塞 IO 多路复用，使用了单线程来轮询描述，将数据库的开、关、读、写都转成了事件，减少了线程切换时上下文的切换和竞争
+
+
+
+### 1.3 Redis 的缓存淘汰机制是怎么样的？
+
+Redis 的缓存淘汰（Eviction）机制是指当Redis 的内存空间不足以容纳新的数据时，Redis 将根据预先设置的策略，自动淘汰部分现有数据，为新数据腾出空间。
+
+这个在Redis中提供了很多种，默认是 noeviction ，不淘汰任何key，但是内存满时不允许写入新数据。
+
+LRU（Least Recently Used，最近最少使用）LRU 会淘汰最近最久未使用的数据。当Redis 内存空间不足时，Redis 将淘汰最近最久未使用的数据，为新数据腾出空间。
+		LFU（Least Frequently Used， 最不经常使用）LFU 会淘汰使用频率最低的数据。当Redis 内存空间不足时，Redis 将淘汰使用频率最低的数据，为新数据腾出空间。
+		Random（随机淘汰）随机淘汰策略会随机选择一些数据进行淘汰，没有明确的淘汰规则。当Redis 内存空间不足时，Redis 会随机选择一些数据进行淘汰，并为新数据腾出空间。
+		TTL（Time To Live）当数据设置了过期时间，在数据过期后，Redis 会自动将该数据从缓存中淘汰。
+Maxmemory Policy   通过配置max-memory-policy 参数来指定缓存淘汰策略，可以选择以上任意一种策略或它们的组合。
+
+
+
+### 1.4 Redis的 io 多路复用是什么？
+
+在 Redis 中，多路复用是通过select、poll、epoll这样的系统调用来实现的。
+
+Redis 服务器通过使用这些系统调用来监听多个客户端连接，以及与其他 Redis 服务器进行通信的连接。当有连接准备好进行读写时，服务器就会立即知道并进行相应的操作
+
+
+
+### 1.5 Redis 作为缓存，MySQL 的数据如何保证与Redis 进行同步？
+
+采用 redisson 实现的读写锁，保证了对共享资源的互斥访问。读写锁允许多个线程同时获取读锁，因此在读取共享资源时，可以实现并发读取，提高了系统的读取性能。但是当有线程获取写锁时，其他线程无法同时获取读锁，保证了操作的原子性，避免了读取到部分更新的数据。
+
+
+
+### 1.6 说一下Redis 的缓存雪崩、缓存穿透、缓存击穿问题
+
+**缓存雪崩:** 在搞并发下，大量的缓存key 在同一时间失效，导致大量的请求落到数据库上，如活动系统里面同时进行着非常多的活动，但是在某个时间点所有的活动缓存全部过期。
+		**解决方案**：
+
+​	1.缓存数据的过期时间设置随机，防止同一时间大量数据过期现象发生
+​			2.如果缓存数据是分布式部署，将热点数据均匀分布在不同的缓存数据库中。
+​			3.设置热点数据永不过期。
+
+**缓存穿透:** 访问一个不存在的key （查询 userId = -10）,缓存不起作用，请求会穿透到DB，流量大时DB会挂掉。
+		**解决方案：**
+
+​	1.接口层增加校验，如用户鉴权校验，id做基础校验，id <= 0的直接拦截；
+​			2.从缓存取不到的数据，在数据库中没有取到，这时可以将key-value 对写成key-null ，缓存有效
+
+**缓存击穿:**  一个存在的key，在缓存过期的那一刻，同时有大量的请求，这些请求都会击穿到DB，造成瞬时DB请求量大、压力骤增。
+		**解决方案**：
+
+​	1.设置热点数据永不过期
+​			2.加互斥锁，业界比较常用的做法。简单来说，就是在缓存失效的时候（判断拿出来的值是否为空），不是立即去加载数据库，而是先使用缓存工具的某些带成功操作返回值的操作（比如Redis 的SETNX）去set一个metex key，当操作返回成功时，再进行加载数据库的操作并回设缓存；否则，就重试整个get 缓存的方法。
+
+
+
+### 1.7 如何解决Redis 的缓存穿透问题
+
+缓存穿透是指查询一个一定不存在的数据，如果从存储层查不到数据则不写入缓存，这将导致这个不存在的数据每次请求都要到 DB 去查询，可能导致 DB 挂掉。这种情况大概率是遭到了攻击。
+		使用布隆过滤器来解决缓存穿透：主要是用于检索一个元素是否在一个集合中。我们当时使用的是redisson 实现的布隆过滤器。它的底层主要是先去初始化一个比较大数组，里面存放的二进制 0 或 1。在一开始都是 0， 当一个 key 来了之后经过3次 hash 计算，模于数组长度找到数据的下标然后把数组1中原来的 0 改为 1，这样的话，三个数组的位置就能标明一个key 的存在。查找的过程也是一样的。当然是有缺点的，布隆过滤器有可能会产生一定的误判，我们一般可以设置这个误判率，大概不会超过5%，其实这个误判是必然存在的，要不就得增加数组的长度，5% 以内的误判率一般的项目也能接受，不至于高并发下压倒数据库。
+
+
+
+## 2. 乐观锁和悲观锁
+
+如果将悲观锁（Pessimistic Lock）和乐观锁（PessimisticLock 或 OptimisticLock）对应到现实生活中来。悲观锁有点像是一位比较悲观（也可以说是未雨绸缪）的人，总是会假设最坏的情况，避免出现问题。乐观锁有点像是一位比较乐观的人，总是会假设最好的情况，在要出现问题之前快速解决问题。
+
+在程序世界中，乐观锁和悲观锁的最终目的都是为了保证线程安全，避免在并发场景下的资源竞争问题。但是，相比于乐观锁，悲观锁对性能的影响更大！
+
+### 2.1 什么是悲观锁
+
+悲观锁总是假设最坏的情况，认为共享资源每次被访问的时候就会出现问题(比如共享数据被修改)，所以每次在获取资源操作的时候都会上锁，这样其他线程想拿到这个资源就会阻塞直到锁被上一个持有者释放。也就是说，共享资源每次只给一个线程使用，其它线程阻塞，用完后再把资源转让给其它线程。
+
+像 Java 中的 synchronized 和 ReentrantLock 等独占锁就是悲观锁思想的实现
+
+
+
+### 2.2 什么是乐观锁
+
+乐观锁总是假设最好的情况，认为共享资源每次被访问的时候不会出现问题，线程可以不停地执行，无需加锁也无需等待，只是在提交修改的时候去验证对应的资源（也就是数据）是否被其它线程修改了（具体方法可以使用版本号机制或 CAS 算法）。
+
+像 Java 中java.util.concurrent.atomic包下面的原子变量类（比如AtomicInteger、LongAdder）就是使用了乐观锁的一种实现方式 CAS 实现的。
+
+高并发的场景下，乐观锁相比悲观锁来说，不存在锁竞争造成线程阻塞，也不会有死锁的问题，在性能上往往会更胜一筹。但是，如果冲突频繁发生（写占比非常多的情况），会频繁失败和重试（悲观锁的开销是固定的），这样同样会非常影响性能，导致 CPU 飙升。
+
+不过，大量失败重试的问题也是可以解决的，像我们前面提到的 LongAdder以空间换时间的方式就解决了这个问题。
+
+理论上来说：
+
+悲观锁通常多用于写比较多的情况下（多写场景，竞争激烈），这样可以避免频繁失败和重试影响性能，悲观锁的开销是固定的。不过，如果乐观锁解决了频繁失败和重试这个问题的话（比如LongAdder），也是可以考虑使用乐观锁的，要视实际情况而定。
+乐观锁通常多于写比较少的情况下（多读场景，竞争较少），这样可以避免频繁加锁影响性能。不过，乐观锁主要针对的对象是单个共享变量（参考java.util.concurrent.atomic包下面的原子变量类）。
+
+
+
+### 2.3 如何实现乐观锁？
+
+乐观锁一般会使用版本号机制或 CAS 算法实现，CAS 算法相对来说更多一些，这里需要格外注意
+
+#### 2.3.1 版本号机制
+
+一般是在数据表中加上一个数据版本号 version 字段，表示数据被修改的次数。当数据被修改时，version 值会加一。当线程 A 要更新数据值时，在读取数据的同时也会读取 version 值，在提交更新时，若刚才读取到的 version 值为当前数据库中的 version 值相等时才更新，否则重试更新操作，直到更新成功。
+
+举一个简单的例子：假设数据库中帐户信息表中有一个 version 字段，当前值为 1 ；而当前帐户余额字段（ balance ）为 $100 。
+
+​	1.操作员 A 此时将其读出（ version=1 ），并从其帐户余额中扣除 $50（ $100-$50 ）。
+​			2.在操作员 A 操作的过程中，操作员 B 也读入此用户信息（ version=1 ），并从其帐户余额中扣除 $20 （ $100-$20 ）。
+​			3.操作员 A 完成了修改工作，将数据版本号（ version=1 ），连同帐户扣除后余额（ balance=$50 ），提交至数据库更新，此时由于提交数据版本等于数据库记录当前版本，数据被更新，数据库记录 version 更新为 2 。
+​			4.操作员 B 完成了操作，也将版本号（ version=1 ）试图向数据库提交数据（ balance=$80 ），但此时比对数据库记录版本时发现，操作员 B 提交的数据版本号为 1 ，数据库记录当前版本也为 2 ，不满足 “ 提交版本必须等于当前版本才能执行更新 “ 的乐观锁策略，因此，操作员 B 的提交被驳回。
+​	这样就避免了操作员 B 用基于 version=1 的旧数据修改的结果覆盖操作员 A 的操作结果的可能
+
+
+
+#### 2.3.2 CAS算法
+
+CAS 的全称是 Compare And Swap（比较与交换） ，用于实现乐观锁，被广泛应用于各大框架中。CAS 的思想很简单，就是用一个预期值和要更新的变量值进行比较，两值相等才会进行更新。
+
+CAS 是一个原子操作，底层依赖于一条 CPU 的原子指令。
+
+原子操作 即最小不可拆分的操作，也就是说操作一旦开始，就不能被打断，直到操作完成。
+
+CAS 涉及到三个操作数：
+
+V：要更新的变量值(Var)
+		E：预期值(Expected)
+		N：拟写入的新值(New)
+	当且仅当 V 的值等于 E 时，CAS 通过原子方式用新值 N 来更新 V 的值。如果不等，说明已经有其它线程更新了 V，则当前线程放弃更新。
+
+举一个简单的例子：线程 A 要修改变量 i 的值为 6，i 原值为 1（V = 1，E=1，N=6，假设不存在 ABA 问题）。
+
+​	1.i 与 1 进行比较，如果相等， 则说明没被其他线程修改，可以被设置为 6 。
+​			2.i 与 1 进行比较，如果不相等，则说明被其他线程修改，当前线程放弃更新，CAS 操作失败。
+​		当多个线程同时使用 CAS 操作一个变量时，只有一个会胜出，并成功更新，其余均会失败，但失败的线程并不会被挂起，仅是被告知失败，并且允许再次尝试，当然也允许失败的线程放弃操作。
+
+Java 语言并没有直接实现 CAS，CAS 相关的实现是通过 C++ 内联汇编的形式实现的（JNI 调用）。因此， CAS 的具体实现和操作系统以及 CPU 都有关系。
+
+
+
+### 2.4 CAS算法存在哪些问题？
+
+#### 2.4.1 ABA 问题
+
+如果一个变量 V 初次读取的时候是 A 值，并且在准备赋值的时候检查到它仍然是 A 值，那我们就能说明它的值没有被其他线程修改过了吗？很明显是不能的，因为在这段时间它的值可能被改为其他值，然后又改回 A，那 CAS 操作就会误认为它从来没有被修改过。这个问题被称为 CAS 操作的 "ABA"问题。
+
+ABA 问题的解决思路是在变量前面追加上版本号或者时间戳。JDK 1.5 以后的 AtomicStampedReference 类就是用来解决 ABA 问题的，其中的 compareAndSet() 方法就是首先检查当前引用是否等于预期引用，并且当前标志是否等于预期标志，如果全部相等，则以原子方式将该引用和该标志的值设置为给定的更新值
+
+
+
+#### 2.4.2 循环时间长开销大
+
+CAS 经常会用到自旋操作来进行重试,也就是不成功就一直循环执行直到成功。如果长时间不成功，会给 CPU 带来非常大的执行开销
+
+如果 JVM 能支持处理器提供的 pause 指令那么效率会有一定的提升，pause 指令有两个作用：
+
+​	1.可以延迟流水线执行指令,使 CPU 不会消耗过多的执行资源，延迟的时间取决于具体实现的版本，在一些处理器上延迟时间是零
+​			2.可以避免在退出循环的时候因内存顺序冲突而引起 CPU 流水线被清空，从而提高 CPU 的执行效率。
+
+
+
+#### 2.4.3 只能保证一个共享变量的原子操作
+
+CAS 只对单个共享变量有效，当操作涉及跨多个共享变量时 CAS 无效。但是从 JDK 1.5 开始，提供了AtomicReference类来保证引用对象之间的原子性，你可以把多个变量放在一个对象里来进行 CAS 操作.所以我们可以使用锁或者利用AtomicReference类把多个共享变量合并成一个共享变量来操作
+
+
+
+## 3. Nginx 反向代理和负载均衡
+
+nginx 反向代理，就是将前端发送的动态请求由 nginx 转发到后端服务器。
+
+那为什么不直接通过浏览器直接请求后台服务器，需要通过nginx 反向代理呢？
+
+### 3.1 nginx 反向代理的好处
+
+1.提高访问速度
+
+​        因为nginx本身可以进行缓存，如果访问的同一接口，并且做了数据缓存，nginx就直接可把数据返回，不需要真正访问服务端，从而提高访问速度
+​		2.进行负载均衡
+
+​        所谓负载均衡，就是把大量的请求按照我们指定的方式均衡的分配给集群中的每台服务器。
+​		3.保证后端服务安全
+
+​       因为一般后台服务地址不会暴露，所以浏览器不能直接访问，可以把nginx 作为请求访问的入口；请求到达nginx 后转发到具体的服务器中，从而保证后端服务的安全
+
+
+
+### 3.2 正向代理
+
+正向代理是客户端发送请求后代理服务器访问目标服务器，代理服务器代表客户端发送请求并将相应返回给客户端。正向代理隐藏了客户端的真实身份和位置信息，为客户端提供代理访问互联网的功能
+
+
+
+### 3.3 反向代理
+
+反向代理是指服务器接受客户端的请求，然后将请求转发给后端服务器，并将后端服务器的响应返回给客户端。反向代理隐藏了服务器的真实身份和位置信息，客户端只知道与反向代理进行通信，而不知道真正的服务器
+
+
+
+## 4. 员工登录的流程
+
+员工登录流程：
+
+​	1.前端在登录页面 登录，发送请求；（登录成功后，生成令牌）
+​			2.进入 拦截器，拦截器放行所有登录页面的请求；
+​			3.进入 三层架构 ，查询用户是否存在，若存在，则加密，返回JWT token，存放在请求头部。用户不存在，则不能登录。
+​			4.当客户端需要访问资源时，通常会在请求头中携带 JWT。（后续每个请求，都要携带JWT令牌，系统在每次请求处理之前，先校验令牌，通过后，再处理）
+
+### 4.1 JWT token ThreadLocal 拦截器
+
+用户登录 ==》 认证通过 ==》生成 jwt token 返回给前端，前端发起请求时携带token，放行/不放行；
+
+客户端发起的每一次请求都是一个单独的线程；
+
+拦截器验证通过，将用户id 通过 ThreadLocal 放入内存，在serviceImpl 阶段使用时从内存中拿出获取用户id （在程序中我们已经将ThreadLocal 封装成一个类 BaseContext）；
+
+实现JWT拦截的步骤？
+
+​	1.自定义拦截器类
+
+```java
+/**
+ * jwt令牌校验的拦截器
+ */
+@Component
+@Slf4j
+public class JwtTokenAdminInterceptor implements HandlerInterceptor {
+
+    @Autowired
+    private JwtProperties jwtProperties;
+
+    /**
+     * 校验jwt
+     *
+     * @param request
+     * @param response
+     * @param handler
+     * @return
+     * @throws Exception
+     */
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        System.out.println("当前线程的id: " + Thread.currentThread().getId());
+
+        //判断当前拦截到的是Controller的方法还是其他资源
+        if (!(handler instanceof HandlerMethod)) {
+            //当前拦截到的不是动态方法，直接放行
+            return true;
+        }
+
+        //1、从请求头中获取令牌
+        String token = request.getHeader(jwtProperties.getAdminTokenName());
+
+        //2、校验令牌
+        try {
+            log.info("jwt校验:{}", token);
+            Claims claims = JwtUtil.parseJWT(jwtProperties.getAdminSecretKey(), token);
+            Long empId = Long.valueOf(claims.get(JwtClaimsConstant.EMP_ID).toString());
+            log.info("当前员工id：", empId);
+            BaseContext.setCurrentId(empId);
+            //3、通过，放行
+            return true;
+        } catch (Exception ex) {
+            //4、不通过，响应401状态码
+            response.setStatus(401);
+            return false;
+        }
+    }
+}
+```
+
+​	2.配置拦截器
+
+我们必须告诉项目我们配置的拦截器是哪个？拦截的地址是啥？放行的地址又是啥？
+
+​	addPathPatterns方法定义拦截的地址
+
+​	excludePathPatterns定义排除某些地址
+
+```java
+/**
+ * 配置类，注册web层相关组件
+ */
+@Configuration
+@Slf4j
+public class WebMvcConfiguration extends WebMvcConfigurationSupport {
+
+    @Autowired
+    private JwtTokenAdminInterceptor jwtTokenAdminInterceptor;
+
+    @Autowired
+    private JwtTokenUserInterceptor jwtTokenUserInterceptor;
+
+    /**
+     * 注册自定义拦截器
+     *
+     * @param registry
+     */
+    protected void addInterceptors(InterceptorRegistry registry) {
+        log.info("开始注册自定义拦截器...");
+        registry.addInterceptor(jwtTokenAdminInterceptor)
+                .addPathPatterns("/admin/**")
+                .excludePathPatterns("/admin/employee/login");
+
+        registry.addInterceptor(jwtTokenUserInterceptor)
+                .addPathPatterns("/user/**")
+                .excludePathPatterns("/user/user/login")
+                .excludePathPatterns("/user/shop/status");
+    }
+}    
+```
+
+
+
+### 4.2 session 和 cookie
+
+1.Cookie 可以存储在浏览器或者本地，Session 只能存在服务器；
+		2.session 能够存储任意的 java 对象，cookie 只能存储 String 类型的对象
+		3.Session比Cookie更具有安全性（Cookie有安全隐患，通过拦截或本地文件找得到你的cookie后可以进行攻击）
+		4.Session占用服务器性能，Session过多，增加服务器压力
+		5.单个Cookie保存的数据不能超过4K，很多浏览器都限制一个站点最多保存20个Cookie，Session是没有大小限制和服务器的内存大小有关
+
+
+
+### 4.3 JWT（JSON Web Token）
+
+为什么需要JWT？
+答：HTTP协议是无状态的，也就是说，如果我们已经认证了一个用户，那么他下一次请求的时候，服务器不知道我是谁，我们必须再次认证
+
+JWT和Session有什么区别？
+答：相同点是，它们都是存储用户信息；然而，Session是在服务器端的，而JWT是在客户端的。Session方式存储用户信息的最大问题在于要占用大量服务器内存，增加服务器的开销。而JWT方式将用户状态分散到了客户端中，可以明显减轻服务端的内存压力。
+
+JWT是如何工作的？
+用户携带用户名和密码请求访问登录接口，如果没有任何问题，我使用用户名和密码生成token。然后每次浏览器访问网站的请求，都会带上token。
+
+注意：每一次请求中的token都会放在请求头中。
+
+JWT使用步骤？
+
+​	1.自定义一个JWT工具类
+
+```java
+/**
+ * JwtUtil用于生成 jwt令牌 和校验 jwt令牌
+ * 我们要明白除了/user/login 和/user/regist这两个请求不需要拦截，
+ * 其他的请求必须要拦截，那我们在每个请求方法里面校验jwt，这显然不合适
+ * 我们想到一个办法：每次请求之前设置一个拦截器JwtTokenAdminInterceptor，
+ * 用于进行jwt的校验。
+ *
+ * 在后面的业务中发现，我们需要用户id，每次都从JWT中获取非常麻烦，所以我们想到了
+ * ThreadLocal（BaseContext），我们将当前登陆用户的id存储在这里面，每次需要id就上前取。那么，
+ * 我们在哪里将id存储在THreadLocal中，答案：拦截器。代码如下：
+ * BaseContext.setCurrentId(empId);
+ */
+public class JwtUtil {
+    /**
+     * 生成jwt
+     * 使用Hs256算法, 私匙使用固定秘钥
+     *
+     * @param secretKey jwt秘钥
+     * @param ttlMillis jwt过期时间(毫秒)
+     * @param claims    设置的信息
+     * @return
+     */
+    public static String createJWT(String secretKey, long ttlMillis, Map<String, Object> claims) {
+        // 指定签名的时候使用的签名算法，也就是header那部分
+        SignatureAlgorithm signatureAlgorithm = SignatureAlgorithm.HS256;
+
+        // 生成JWT的时间
+        long expMillis = System.currentTimeMillis() + ttlMillis;
+        Date exp = new Date(expMillis);
+
+        // 设置jwt的body
+        JwtBuilder builder = Jwts.builder()
+                // 如果有私有声明，一定要先设置这个自己创建的私有的声明，这个是给builder的claim赋值，一旦写在标准的声明赋值之后，就是覆盖了那些标准的声明的
+                .setClaims(claims)
+                // 设置签名使用的签名算法和签名使用的秘钥
+                .signWith(signatureAlgorithm, secretKey.getBytes(StandardCharsets.UTF_8))
+                // 设置过期时间
+                .setExpiration(exp);
+
+        return builder.compact();
+    }
+
+    /**
+     * Token解密
+     *
+     * @param secretKey jwt秘钥 此秘钥一定要保留好在服务端, 不能暴露出去, 否则sign就可以被伪造, 如果对接多个客户端建议改造成多个
+     * @param token     加密后的token
+     * @return
+     */
+    public static Claims parseJWT(String secretKey, String token) {
+        // 得到DefaultJwtParser
+        Claims claims = Jwts.parser()
+                // 设置签名的秘钥
+                .setSigningKey(secretKey.getBytes(StandardCharsets.UTF_8))
+                // 设置需要解析的jwt
+                .parseClaimsJws(token).getBody();
+        return claims;
+    }
+
+}
+```
+
+​	2.在登录接口处，创建token并返回
+
+```java
+/**
+ * 登录
+ *
+ * @param employeeLoginDTO
+ * @return
+ */
+@PostMapping("/login")
+@ApiOperation(value = "员工登录")
+public Result<EmployeeLoginVO> login(@RequestBody EmployeeLoginDTO employeeLoginDTO) {
+    log.info("员工登录：{}", employeeLoginDTO);
+
+    Employee employee = employeeService.login(employeeLoginDTO);
+
+    //登录成功后，生成jwt令牌
+    Map<String, Object> claims = new HashMap<>();
+    claims.put(JwtClaimsConstant.EMP_ID, employee.getId());
+    String token = JwtUtil.createJWT(
+            jwtProperties.getAdminSecretKey(),
+            jwtProperties.getAdminTtl(),
+            claims);
+
+    EmployeeLoginVO employeeLoginVO = EmployeeLoginVO.builder()
+            .id(employee.getId())
+            .userName(employee.getUsername())
+            .name(employee.getName())
+            .token(token)
+            .build();
+
+    return Result.success(employeeLoginVO);
+}
+```
+
+```java
+@Component
+@ConfigurationProperties(prefix = "sky.jwt")
+@Data
+public class JwtProperties {
+
+    /**
+     * 管理端员工生成jwt令牌相关配置
+     */
+    private String adminSecretKey;
+    private long adminTtl;
+    private String adminTokenName;
+
+    /**
+     * 用户端微信用户生成jwt令牌相关配置
+     */
+    private String userSecretKey;
+    private long userTtl;
+    private String userTokenName;
+
+}
+```
+
+```yml
+sky:
+  jwt:
+    # 设置jwt签名加密时使用的秘钥
+    admin-secret-key: itcast
+    # 设置jwt过期时间
+    admin-ttl: 7200000
+    # 设置前端传递过来的令牌名称
+    admin-token-name: token
+    user-secret-key: itheima
+    user-ttl: 7200000
+    user-token-name: authentication
+```
+
+
+
+### 4.4 ThreaLocal
+
+作用：ThreaLocal 为每一个线程提供一个单独的存储空间，具有线程隔离的作用，只有在同一个线程内才可以获得他的值，以保证线程安全。（线程之内，数据共享；线程之间，数据隔离。）
+
+在本次开发中,在对JWT令牌进行解析,获得当前请求的用户ID 以后将该ID 保存至ThreadLocal 中，以便在之后的操作中查看当前用户
+
+如何使用ThreadLocal？
+
+​	1.自定义ThreadLocal工具类
+
+```java
+package com.sky.context;
+
+public class BaseContext {
+
+    public static ThreadLocal<Long> threadLocal = new ThreadLocal<>();
+
+    public static void setCurrentId(Long id) {
+        threadLocal.set(id);
+    }
+
+    public static Long getCurrentId() {
+        return threadLocal.get();
+    }
+
+    public static void removeCurrentId() {
+        threadLocal.remove();
+    }
+
+}
+```
+
+
+
+## 5. 对象映射器
+
+对象映射器:基于jackson将Java对象转为json，或者将json转为Java对象
+
+对象映射器的作用
+
+​	1.将JSON解析为Java对象的过程称为 [从JSON反序列化Java对象]
+
+​	2.从Java对象生成JSON的过程称为 [序列化Java对象到JSON]
+
+将前端发送的数据过于长超过16位时，long的精度为16位，导致精度不准确，例如id为雪花算法的自动生成，导致前端发出的请求后端的接收的数据精度受到影响，转换为json格式，就解决了这个问题，包括日期型的相关转化（js对于long类型会造成精度损失）
+
+后端日期转发给前端时，出现了精度损失
+
+对象映射器使用步骤
+
+​	1.自定义一个对象映射器java
+
+```java
+/**
+ * 对象映射器:基于jackson将Java对象转为json，或者将json转为Java对象
+ * 将JSON解析为Java对象的过程称为 [从JSON反序列化Java对象]
+ * 从Java对象生成JSON的过程称为 [序列化Java对象到JSON]
+ */
+public class JacksonObjectMapper extends ObjectMapper {
+
+    public static final String DEFAULT_DATE_FORMAT = "yyyy-MM-dd";
+    //public static final String DEFAULT_DATE_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
+    public static final String DEFAULT_DATE_TIME_FORMAT = "yyyy-MM-dd HH:mm";
+    public static final String DEFAULT_TIME_FORMAT = "HH:mm:ss";
+
+    public JacksonObjectMapper() {
+        super();
+        //收到未知属性时不报异常
+        this.configure(FAIL_ON_UNKNOWN_PROPERTIES, false);
+
+        //反序列化时，属性不存在的兼容处理
+        this.getDeserializationConfig().withoutFeatures(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+        SimpleModule simpleModule = new SimpleModule()
+                .addDeserializer(LocalDateTime.class, new LocalDateTimeDeserializer(DateTimeFormatter.ofPattern(DEFAULT_DATE_TIME_FORMAT)))
+                .addDeserializer(LocalDate.class, new LocalDateDeserializer(DateTimeFormatter.ofPattern(DEFAULT_DATE_FORMAT)))
+                .addDeserializer(LocalTime.class, new LocalTimeDeserializer(DateTimeFormatter.ofPattern(DEFAULT_TIME_FORMAT)))
+                .addSerializer(LocalDateTime.class, new LocalDateTimeSerializer(DateTimeFormatter.ofPattern(DEFAULT_DATE_TIME_FORMAT)))
+                .addSerializer(LocalDate.class, new LocalDateSerializer(DateTimeFormatter.ofPattern(DEFAULT_DATE_FORMAT)))
+                .addSerializer(LocalTime.class, new LocalTimeSerializer(DateTimeFormatter.ofPattern(DEFAULT_TIME_FORMAT)));
+
+        //注册功能模块 例如，可以添加自定义序列化器和反序列化器
+        this.registerModule(simpleModule);
+    }
+}
+```
+
+2.WebMvcConfig里进行配置
+
+```java
+/**
+ * 扩展 Spring MVC 框架的消息转换器
+ * @param converters
+ */
+protected void extendMessageConverters(List<HttpMessageConverter<?>> converters) {
+    log.info("扩展消息转换器...");
+    //创建消息转换器对象
+    MappingJackson2HttpMessageConverter converter = new MappingJackson2HttpMessageConverter();
+    //设置对象转换器，底层使用Jackson将Java对象转为json
+    converter.setObjectMapper(new JacksonObjectMapper());
+    //将上面的消息转换器对象追加到mvc框架的转换器集合中
+    converters.add(0, converter);
 }
 ```
