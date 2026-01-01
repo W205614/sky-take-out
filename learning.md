@@ -10961,3 +10961,1314 @@ protected void extendMessageConverters(List<HttpMessageConverter<?>> converters)
     converters.add(0, converter);
 }
 ```
+
+
+
+
+
+## 6. Swagger作用、Knife 4j、PageHelper
+
+### 6.1 Swagger
+
+1.定义：Swagger 是一个用于设计、构建和文档化 RESTful Web 服务的工具集。
+		2.作用：用来在后端生成接口文档，辅助前端测试。使用 Swagger 只需要按照它的规范定义接口以及接口的相关信息，就可以做到生成接口文档，以及在线接口调试页面。
+
+
+
+### 6.2 Knife 4j
+
+Knife 4 j 是 Swagger 的一个增强工具，是基于 Swagger 构建的一款功能强大的文档工具。它提供了一系列注解，用于增强对 API 文档的描述和可视化展示。如在苍穹外卖项目中常用的 Knife 4 j 注解介绍：
+
+@Api：用于对 Controller 类进行说明和描述，可以指定 Controller 的名称、描述、标签等信息。
+		@ApiOperation：用于对 Controller 中的方法进行说明和描述，可以指定方法的名称、描述、请求方法（GET、POST 等）等信息
+
+```java
+/**
+ * 通过knife4j生成接口文档
+ * @return
+ */
+@Bean
+public Docket docket1() {
+    ApiInfo apiInfo = new ApiInfoBuilder()
+            .title("苍穹外卖项目接口文档")
+            .version("2.0")
+            .description("苍穹外卖项目接口文档")
+            .build();
+    Docket docket = new Docket(DocumentationType.SWAGGER_2)
+            .groupName("管理端接口")
+            .apiInfo(apiInfo)
+            .select()
+            .apis(RequestHandlerSelectors.basePackage("com.sky.controller.admin"))
+            .paths(PathSelectors.any())
+            .build();
+    return docket;
+}
+
+@Bean
+public Docket docket2() {
+    ApiInfo apiInfo = new ApiInfoBuilder()
+            .title("苍穹外卖项目接口文档")
+            .version("2.0")
+            .description("苍穹外卖项目接口文档")
+            .build();
+    Docket docket = new Docket(DocumentationType.SWAGGER_2)
+            .groupName("用户端接口")
+            .apiInfo(apiInfo)
+            .select()
+            .apis(RequestHandlerSelectors.basePackage("com.sky.controller.user"))
+            .paths(PathSelectors.any())
+            .build();
+    return docket;
+}
+
+/**
+ * 设置静态资源映射
+ * @param registry
+ */
+protected void addResourceHandlers(ResourceHandlerRegistry registry) {
+    registry.addResourceHandler("/doc.html").addResourceLocations("classpath:/META-INF/resources/");
+    registry.addResourceHandler("/webjars/**").addResourceLocations("classpath:/META-INF/resources/webjars/");
+}
+```
+
+
+
+### 6.3 PageHelper （Mybatis 提供的插件），如何实现分页查询？
+
+PageHelper是MyBatis的一个插件，内部实现了一个PageInterceptor拦截器。Mybatis会加载这个拦截器到拦截器链中。在我们使用过程中先使用PageHelper.startPage这样的语句在当前线程上下文中设置一个ThreadLocal变量，再利用PageInterceptor这个分页拦截器拦截，从ThreadLocal中拿到分页的信息，如果有分页信息拼装分页SQL（limit语句等）进行分页查询，最后再把ThreadLocal中的东西清除掉
+
+1.设置分页参数：在执行查询之前，首先通过 PageHelper.startPage(int pageNum, int pageSize) 方法设置分页的参数，调用该方法时，通过 ThreadLocal 存储分页信息。
+		2.拦截查询语句：PageHelper 利用 MyBatis 提供的插件 API（Interceptor 接口）来拦截原始的查询语句。MyBatis 执行任何 SQL 语句前，都会先通过其插件体系中的拦截器链，PageHelper 正是在这个环节介入的。
+		3.修改原始SQL语句：在拦截原始查询语句后，PageHelper 会根据分页参数动态地重写或添加 SQL 语句，使其成为一个分页查询。
+执行分页查询：修改后的 SQL 语句被执行，返回当前页的数据。
+		4.查询总记录数：如果需要获取总记录数，PageHelper 会自动执行一个派生的查询，以计算原始查询（不包含分页参数）的总记录数。这通常通过移除原始 SQL 的排序（ORDER BY）和分页（LIMIT、OFFSET 等）条件，加上 COUNT(*) 的包装来实现。
+		5.返回分页信息：查询结果被封装在 PageInfo 对象中（或其他形式的分页结果对象），这个对象除了包含当前页的数据列表外，还提供了总记录数、总页数、当前页码等分页相关的信息，方便在应用程序中使用java
+
+```java
+/**
+ * 员工分页查询
+ * @param employeePageQueryDTO
+ * @return
+ */
+@Override
+public PageResult pageQuery(EmployeePageQueryDTO employeePageQueryDTO) {
+    PageHelper.startPage(employeePageQueryDTO.getPage(), employeePageQueryDTO.getPageSize());
+
+    Page<Employee> page = employeeMapper.pageQuery(employeePageQueryDTO);
+    long total = page.getTotal();
+    List<Employee> records = page.getResult();
+
+    return new PageResult(total, records);
+}
+```
+
+
+
+## 7. 什么是反射？
+
+反射是一种在程序运行时检查和操作类的机制，通过获取类的信息并动态调用方法、创建对象等。这种机制让程序能够在运行时根据需要动态地获取和操作类的结构和成员
+
+1.获取 Class 对象
+
+​        程序通过类的全限定名、对象的getClass()方法或 .Class 语法来获取对应的Class对象。
+​		2.查询类信息
+
+​     通过Class对象获取类的信息，包括类名、包名、父类、实现的接口、构造函数、方法、字段等。
+​		3.动态创建对象
+
+​    通过 Class 对象的 newInstance ()方法调用类的默认构造函数来创建对象，或者通过 Constructor 对象调用类的其他构造函数来创建对象。
+​		4.动态调用方法
+
+   通过 Method 对象调用类的方法，传递参数并获取返回值。
+		5.动态访问字段 
+
+  通过 Field 对象获取和设置类的字段值。
+整个流程就是通过获取 Class 对象，然后根据需要动态地调用类的方法、创建对象、访问字段等操作，实现了对类的动态操作和调用
+
+
+
+## 8. 公共字段自动填充
+
+### 8.1 问题分析
+
+业务表中的公共字段：
+
+| **序号** | **字段名**  | **含义** | **数据类型** |
+| -------- | ----------- | -------- | ------------ |
+| 1        | create_time | 创建时间 | datetime     |
+| 2        | create_user | 创建人id | bigint       |
+| 3        | update_time | 修改时间 | datetime     |
+| 4        | update_user | 修改人id | bigint       |
+
+```java
+//设置当前记录的创建时间、修改时间、创建人、修改人
+employee.setCreateTime(LocalDateTime.now());
+employee.setUpdateTime(LocalDateTime.now());
+employee.setCreateUser(BaseContext.getCurrentId());
+employee.setUpdateUser(BaseContext.getCurrentId());
+
+//设置创建时间、修改时间、创建人、修改人
+category.setCreateTime(LocalDateTime.now());
+category.setUpdateTime(LocalDateTime.now());
+category.setCreateUser(BaseContext.getCurrentId());
+category.setUpdateUser(BaseContext.getCurrentId());
+```
+
+问题：代码冗余、不便于后期维护
+
+
+
+### 8.2 实现思路
+
+| **序号** | **字段名**  | **含义** | **数据类型** | **操作类型**   |
+| -------- | ----------- | -------- | ------------ | -------------- |
+| 1        | create_time | 创建时间 | datetime     | insert         |
+| 2        | create_user | 创建人id | bigint       | insert         |
+| 3        | update_time | 修改时间 | datetime     | insert、update |
+| 4        | update_user | 修改人id | bigint       | insert、update |
+
+1.自定义注解 AutoFill，用于标识需要进行公共字段自动填充的方法
+
+2.自定义切面类 AutoFillAspect，统一拦截加入了 AutoFill 注解的方法，通过反射为公共字段赋值
+
+3.在 Mapper 的方法上加入 AutoFill 注解
+
+技术点：枚举、注解、AOP、反射
+
+
+
+### 8.3 代码开发
+
+#### 8.3.1 OperationType
+
+```java
+/**
+ * 数据库操作类型
+ */
+public enum OperationType {
+
+    /**
+     * 更新操作
+     */
+    UPDATE,
+
+    /**
+     * 插入操作
+     */
+    INSERT
+
+}
+```
+
+
+
+#### 8.3.2 AutoFillConstant
+
+```java
+/**
+ * 公共字段自动填充相关常量
+ */
+public class AutoFillConstant {
+    /**
+     * 实体类中的方法名称
+     */
+    public static final String SET_CREATE_TIME = "setCreateTime";
+    public static final String SET_UPDATE_TIME = "setUpdateTime";
+    public static final String SET_CREATE_USER = "setCreateUser";
+    public static final String SET_UPDATE_USER = "setUpdateUser";
+}
+```
+
+
+
+#### 8.3.3 AutoFill
+
+```java
+/**
+ * 自定义注解, 用于标识某个方法需要进行功能字段自动填充处理
+ */
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface AutoFill {
+    // 数据库操作类型: UPDATE INSERT
+    OperationType value();
+}
+```
+
+
+
+#### 8.3.4 AutoFillAspect
+
+```java
+public class AutoFillAspect {
+    /**
+     * 切入点
+     */
+    @Pointcut("execution(* com.sky.mapper.*.*(..)) && @annotation(com.sky.annotation.AutoFill)")
+    public void autoFillPointCut() {}
+
+    /**
+     * 前置通知
+     */
+    @Before("autoFillPointCut()")
+    public void autoFill(JoinPoint joinPoint) {
+        log.info("开始进行公共字段自动填充...");
+
+        //获取到当前被拦截的方法上的数据库操作类型
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature(); // 方法签名对象
+        AutoFill autoFill = signature.getMethod().getAnnotation(AutoFill.class); // 获得方法上的注解对象
+        OperationType operationType = autoFill.value(); // 获得数据库操作类型
+
+        // 获取到当前被拦截的方法的参数--实体对象
+        Object[] args = joinPoint.getArgs();
+        if(args == null || args.length == 0) {
+            return;
+        }
+        Object entity = args[0];
+
+        // 准备赋值的数据
+        LocalDateTime now = LocalDateTime.now();
+        Long currentId = BaseContext.getCurrentId();
+
+        // 根据当前不同的数据操作类型, 为对应的属性通过反射来赋值
+        if(operationType == OperationType.INSERT) {
+            // 为4个属性赋值
+            try {
+                Method setCreateTime = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_CREATE_TIME, LocalDateTime.class);
+                Method setCreateUser = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_CREATE_USER, Long.class);
+                Method setUpdateTime = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_UPDATE_TIME, LocalDateTime.class);
+                Method setUpdateUser = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_UPDATE_USER, Long.class);
+
+                // 通过反射为对象属性赋值
+                setCreateTime.invoke(entity, now);
+                setCreateUser.invoke(entity, currentId);
+                setUpdateTime.invoke(entity, now);
+                setUpdateUser.invoke(entity, currentId);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }else if(operationType == OperationType.UPDATE) {
+            // 为2个属性赋值
+            try {
+                Method setUpdateTime = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_UPDATE_TIME, LocalDateTime.class);
+                Method setUpdateUser = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_UPDATE_USER, Long.class);
+
+                setUpdateTime.invoke(entity, now);
+                setUpdateUser.invoke(entity, currentId);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+```
+
+
+
+#### 8.3.5 Mapper层操作
+
+```java
+@AutoFill(value = OperationType.INSERT)
+@AutoFill(value = OperationType.UPDATE)
+```
+
+
+
+## 9. Spring Task 处理定时任务
+
+**苍穹外卖中使用Spring Task**
+
+1.通过定时任务每分钟检查一次是否存在支付超时订单（下单后超过15分钟仍未支付则判定为支付超时订单），如果存在则修改订单状态为“已取消”
+
+2.通过定时任务每天凌晨1点检查一次是否存在“派送中”的订单，如果存在则修改订单状态为“已完成”
+
+
+
+```java
+/**
+ * 定时任务类, 定时处理订单状态
+ */
+@Component
+@Slf4j
+public class OrderTask {
+    @Autowired
+    private OrderMapper orderMapper;
+
+    /**
+     * 处理超时订单的方法
+     */
+    @Scheduled(cron = "0 * * * * ?") // 每分钟触发一次
+    public void processTimeoutOrder() {
+        log.info("定时处理超时订单: {}", LocalDateTime.now());
+
+        LocalDateTime time = LocalDateTime.now().plusMinutes(-15);
+
+        List<Orders> ordersList = orderMapper.getByStatusAndOrderTimeLT(Orders.PENDING_PAYMENT, time);
+
+        if(ordersList != null && ordersList.size() > 0) {
+            for (Orders orders : ordersList) {
+                orders.setStatus(Orders.CANCELLED);
+                orders.setCancelReason("订单超时, 自动取消");
+                orders.setCancelTime(LocalDateTime.now());
+                orderMapper.update(orders);
+            }
+        }
+    }
+
+    /**
+     * 处理一直处于派送中状态的方法
+     */
+    @Scheduled(cron = "0 0 1 * * ?") // 每分钟触发一次
+    public void processDeliveryOrder() {
+        log.info("定时处理派送中订单: {}", LocalDateTime.now());
+
+        LocalDateTime time = LocalDateTime.now().plusMinutes(-60);
+
+        List<Orders> ordersList = orderMapper.getByStatusAndOrderTimeLT(Orders.DELIVERY_IN_PROGRESS, time);
+
+        if(ordersList != null && ordersList.size() > 0) {
+            for (Orders orders : ordersList) {
+                orders.setStatus(Orders.COMPLETED);
+                orderMapper.update(orders);
+            }
+        }
+    }
+}
+```
+
+
+
+## 10. 后端如何与商家建立链接，实现实时通信？
+
+使用 Websocket 来实现用户端和商家端通信：
+		WebSocket 是一种在 Web 应用程序中实现双向通信的协议。它允许客户端和服务器之间建立持久的、双向的通信通道，使得服务器可以主动向客户端推送消息，而无需客户端发送请求。
+		客户端和服务器之间可以实时地发送消息和接收消息，不需要频繁地发起请求。这样可以减少网络流量和延迟，并提供更好的用户体验
+
+
+
+用户下单并且支付成功后，需要第一时间通知外卖商家。通知的形式有如下两种：
+
+**来单提醒：**
+
+- 通过WebSocket实现管理端页面和服务端保持长连接状态
+- 当客户支付后，调用WebSocket的相关API实现服务端向客户端推送消息
+- 客户端浏览器解析服务端推送的消息，判断是来单提醒还是客户催单，进行相应的消息提示和语音播报
+- 约定服务端发送给客户端浏览器的数据格式为JSON，字段包括：type，orderId，content
+    - type 为消息类型，1为来单提醒 2为客户催单
+    - orderId 为订单id
+    - content 为消息内容java
+
+```java
+/**
+ * WebSocket服务
+ */
+@Component
+@ServerEndpoint("/ws/{sid}")
+public class WebSocketServer {
+
+    //存放会话对象
+    private static Map<String, Session> sessionMap = new HashMap();
+
+    /**
+     * 连接建立成功调用的方法
+     */
+    @OnOpen
+    public void onOpen(Session session, @PathParam("sid") String sid) {
+        System.out.println("客户端：" + sid + "建立连接");
+        sessionMap.put(sid, session);
+    }
+
+    /**
+     * 收到客户端消息后调用的方法
+     *
+     * @param message 客户端发送过来的消息
+     */
+    @OnMessage
+    public void onMessage(String message, @PathParam("sid") String sid) {
+        System.out.println("收到来自客户端：" + sid + "的信息:" + message);
+    }
+
+    /**
+     * 连接关闭调用的方法
+     *
+     * @param sid
+     */
+    @OnClose
+    public void onClose(@PathParam("sid") String sid) {
+        System.out.println("连接断开:" + sid);
+        sessionMap.remove(sid);
+    }
+
+    /**
+     * 群发
+     *
+     * @param message
+     */
+    public void sendToAllClient(String message) {
+        Collection<Session> sessions = sessionMap.values();
+        for (Session session : sessions) {
+            try {
+                //服务器向客户端发送消息
+                session.getBasicRemote().sendText(message);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+}
+```
+
+
+
+**在OrderServiceImpl中注入WebSocketServer对象，修改payment方法，加入如下代码：**
+
+```java
+/**
+     * 订单支付
+     * @param ordersPaymentDTO
+     * @return
+     */
+    public OrderPaymentVO payment(OrdersPaymentDTO ordersPaymentDTO) throws Exception {
+        // 当前登录用户id
+        Long userId = BaseContext.getCurrentId();
+        User user = userMapper.getById(userId);
+/*        //调用微信支付接口，生成预支付交易单
+        JSONObject jsonObject = weChatPayUtil.pay(
+                ordersPaymentDTO.getOrderNumber(), //商户订单号
+                new BigDecimal(0.01), //支付金额，单位 元
+                "苍穹外卖订单", //商品描述
+                user.getOpenid() //微信用户的openid
+        );
+
+        if (jsonObject.getString("code") != null && jsonObject.getString("code").equals("ORDERPAID")) {
+            throw new OrderBusinessException("该订单已支付");
+        }
+*/
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("code","ORDERPAID");
+        OrderPaymentVO vo = jsonObject.toJavaObject(OrderPaymentVO.class);
+        vo.setPackageStr(jsonObject.getString("package"));
+        Integer OrderPaidStatus = Orders.PAID;//支付状态，已支付
+        Integer OrderStatus = Orders.TO_BE_CONFIRMED;  //订单状态，待接单
+        LocalDateTime check_out_time = LocalDateTime.now();//更新支付时间
+        orderMapper.updateStatus(OrderStatus, OrderPaidStatus, check_out_time, this.orders.getId());
+
+        Map map = new HashMap();
+        map.put("type", 1);// 消息类型，1表示来单提醒
+        //获取订单id
+        Orders orders=orderMapper.getByNumberAndUserId(ordersPaymentDTO.getOrderNumber(), userId);
+        map.put("orderId", orders.getId());
+        map.put("content", "订单号：" + ordersPaymentDTO.getOrderNumber());
+
+        // 通过WebSocket实现来单提醒，向客户端浏览器推送消息
+        webSocketServer.sendToAllClient(JSON.toJSONString(map));
+        log.info("来单提醒：{}", JSON.toJSONString(map));
+
+        return vo;
+    }
+```
+
+
+
+用户在小程序中点击催单按钮后，需要第一时间通知外卖商家。通知的形式有如下两种： 
+
+**客户催单：**
+
+- 通过WebSocket实现管理端页面和服务端保持长连接状态
+- 当用户点击催单按钮后，调用WebSocket的相关API实现服务端向客户端推送消息
+- 客户端浏览器解析服务端推送的消息，判断是来单提醒还是客户催单，进行相应的消息提示和语音播报
+    约定服务端发送给客户端浏览器的数据格式为JSON，字段包括：type，orderId，content
+    - type 为消息类型，1为来单提醒 2为客户催单
+    - orderId 为订单id
+    - content 为消息内容
+
+当用户点击催单按钮时，向服务端发送请求
+
+```java
+/**
+ * 用户催单
+ * @param id
+ */
+@Override
+public void reminder(Long id) {
+    Orders ordersDB = orderMapper.getById(id);
+
+    // 校验订单是否存在
+    if(ordersDB == null) {
+        throw new OrderBusinessException(MessageConstant.ORDER_STATUS_ERROR);
+    }
+
+    Map map = new HashMap();
+    map.put("type", 2);
+    map.put("orderId", id);
+    map.put("content", "订单号: " + ordersDB.getNumber());
+
+    // 通过websocket向客户端浏览器推送消息
+    webSocketServer.sendToAllClient(JSON.toJSONString(map));
+}
+```
+
+
+
+## 11. 数据统计-图形报表
+
+Apache ECharts
+
+Apache ECharts 是一款基于 Javascript 的数据可视化图表库，提供直观，生动，可交互，可个性化定制的数据可视化图表
+
+**实现步骤：**
+
+1). 引入echarts.js 文件
+
+2). 为 ECharts 准备一个设置宽高的 DOM
+
+3). 初始化echarts实例
+
+4). 指定图表的配置项和数据
+
+5). 使用指定的配置项和数据显示图表
+
+
+
+## 12. webSocket和ThreadLocal
+
+### 12.1 webSocket作用及实现
+
+WebSocket 允许客户端和服务器之间建立持久的连接，可以在连接建立后双向实时地传输数据，实现实时通信功能。
+		相比传统的HTTP 请求-响应模式，WebSocket 的持久连接减少了每次通信的开销。不需要再没次通信时都重新建立连接，减少了通信的延迟和资源消耗。
+		在我们项目中就是支持用户端以及商家管理端与服务器进行双向通信
+
+**实现步骤：**
+
+1). 直接使用websocket.html页面作为WebSocket客户端
+
+2). 导入WebSocket的maven坐标
+
+3). 导入WebSocket服务端组件WebSocketServer，用于和客户端通信
+
+4). 导入配置类WebSocketConfiguration，注册WebSocket的服务端组件
+
+5). 导入定时任务类WebSocketTask，定时向客户端推送数据
+
+
+
+1). 定义websocket.html页面(资料中已提供)
+
+```html
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket Demo</title>
+</head>
+<body>
+    <input id="text" type="text" />
+    <button onclick="send()">发送消息</button>
+    <button onclick="closeWebSocket()">关闭连接</button>
+    <div id="message">
+    </div>
+</body>
+<script type="text/javascript">
+    var websocket = null;
+    var clientId = Math.random().toString(36).substr(2);
+
+    //判断当前浏览器是否支持WebSocket
+    if('WebSocket' in window){
+        //连接WebSocket节点
+        websocket = new WebSocket("ws://localhost:8080/ws/"+clientId);
+    }
+    else{
+        alert('Not support websocket')
+    }
+
+    //连接发生错误的回调方法
+    websocket.onerror = function(){
+        setMessageInnerHTML("error");
+    };
+
+    //连接成功建立的回调方法
+    websocket.onopen = function(){
+        setMessageInnerHTML("连接成功");
+    }
+
+    //接收到消息的回调方法
+    websocket.onmessage = function(event){
+        setMessageInnerHTML(event.data);
+    }
+
+    //连接关闭的回调方法
+    websocket.onclose = function(){
+        setMessageInnerHTML("close");
+    }
+
+    //监听窗口关闭事件，当窗口关闭时，主动去关闭websocket连接，防止连接还没断开就关闭窗口，server端会抛异常。
+    window.onbeforeunload = function(){
+        websocket.close();
+    }
+
+    //将消息显示在网页上
+    function setMessageInnerHTML(innerHTML){
+        document.getElementById('message').innerHTML += innerHTML + '<br/>';
+    }
+
+    //发送消息
+    function send(){
+        var message = document.getElementById('text').value;
+        websocket.send(message);
+    }
+	
+	//关闭连接
+    function closeWebSocket() {
+        websocket.close();
+    }
+</script>
+</html>
+```
+
+
+
+2). 导入maven坐标
+
+在sky-server模块pom.xml中已定义
+
+```xml
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-websocket</artifactId>
+</dependency>
+```
+
+
+
+3). 定义WebSocket服务端组件(资料中已提供)
+
+直接导入到sky-server模块即可
+
+```java
+package com.sky.websocket;
+
+import org.springframework.stereotype.Component;
+import javax.websocket.OnClose;
+import javax.websocket.OnMessage;
+import javax.websocket.OnOpen;
+import javax.websocket.Session;
+import javax.websocket.server.PathParam;
+import javax.websocket.server.ServerEndpoint;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * WebSocket服务
+ */
+@Component
+@ServerEndpoint("/ws/{sid}")
+public class WebSocketServer {
+
+    //存放会话对象
+    private static Map<String, Session> sessionMap = new HashMap();
+
+    /**
+     * 连接建立成功调用的方法
+     */
+    @OnOpen
+    public void onOpen(Session session, @PathParam("sid") String sid) {
+        System.out.println("客户端：" + sid + "建立连接");
+        sessionMap.put(sid, session);
+    }
+
+    /**
+     * 收到客户端消息后调用的方法
+     *
+     * @param message 客户端发送过来的消息
+     */
+    @OnMessage
+    public void onMessage(String message, @PathParam("sid") String sid) {
+        System.out.println("收到来自客户端：" + sid + "的信息:" + message);
+    }
+
+    /**
+     * 连接关闭调用的方法
+     *
+     * @param sid
+     */
+    @OnClose
+    public void onClose(@PathParam("sid") String sid) {
+        System.out.println("连接断开:" + sid);
+        sessionMap.remove(sid);
+    }
+
+    /**
+     * 群发
+     *
+     * @param message
+     */
+    public void sendToAllClient(String message) {
+        Collection<Session> sessions = sessionMap.values();
+        for (Session session : sessions) {
+            try {
+                //服务器向客户端发送消息
+                session.getBasicRemote().sendText(message);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+}
+```
+
+
+
+4). 定义配置类，注册WebSocket的服务端组件(从资料中直接导入即可)
+
+```java
+package com.sky.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.socket.server.standard.ServerEndpointExporter;
+
+/**
+ * WebSocket配置类，用于注册WebSocket的Bean
+ */
+@Configuration
+public class WebSocketConfiguration {
+
+    @Bean
+    public ServerEndpointExporter serverEndpointExporter() {
+        return new ServerEndpointExporter();
+    }
+
+}
+```
+
+
+
+5). 定义定时任务类，定时向客户端推送数据(从资料中直接导入即可)
+
+```java
+package com.sky.task;
+
+import com.sky.websocket.WebSocketServer;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+@Component
+public class WebSocketTask {
+    @Autowired
+    private WebSocketServer webSocketServer;
+
+    /**
+     * 通过WebSocket每隔10秒向客户端发送消息
+     */
+    // @Scheduled(cron = "0/10 * * * * ?")
+    public void sendMessageToClient() {
+        webSocketServer.sendToAllClient("这是来自服务端的消息：" + DateTimeFormatter.ofPattern("HH:mm:ss").format(LocalDateTime.now()));
+    }
+}
+```
+
+
+
+### 12.2 你为什么要用ThreadLocal？底层原理是什么？
+
+ThreadLocal 是Java 中的一个类，用于多线程环境下保存线程局部变量。
+		它提供了一种线程安全的方式，让每个线程都拥有自己独立的变量副本，从而避免了线程间的数据共享和竞争。
+		我们使用ThreadLocal 是来存储在多个方法中需要共享的数据，具体来说就是项目中的用户Id，其他方法需要调用这个参数，我们就不用显示传递给它了。
+		ThreaLocal 的底层原理是通过一个ThreadLocalMap 来实现的。在每个线程中都有一个ThreadLocalMa，用于存储线程局部变量,ThreadLocalMap 中的键是ThreadLocal 对象，值是对应线程的变量副本。当一个线程需要获取变量值时，它首先会获取自己线程的	ThreadLocalMap，并根据ThreadLocal 对象获取对应的变量副本。这样就实现了每个线程都有自己的变量副本，互不影响。
+
+
+
+### 12.3 Websocket 与 HTTP 有什么区别？ 既然 WebSocket 支持双向通信，功能看似比 HTTP 强大，那么是不是可以基于 WebSocket 开发所有的业务功能？
+
+**HTTP 协议和 WebSocket 协议对比：**
+
+​	1.HTTP 是短连接
+​			2.WebSocket 是长连接
+​			3.HTTP 通信是单向的，基于请求响应模式
+​			4.WebSocket 支持双向通信
+​			5.HTTP 和 WebSocket 底层都是 TCP 连接
+
+**不能使用 WebSocket 并不能完全取代 HTTP，它只适合在特定的场景下使用，原因如下**：
+
+​	1.资源开销：WebSocket 需要保持持久连接，对服务器资源有更高要求，不适合所有场景。
+​			2.功能与约定：HTTP 提供丰富的功能和约定（如状态码、缓存控制），适合更广泛的业务需求。
+​			3.安全性和兼容性：虽然 WebSocket 支持加密，但管理安全性可能更复杂；且某些环境下 WebSocket 不被支持或有限制。
+​			4.设计和实践：RESTful API 和相关的 HTTP 设计原则不易直接应用于 WebSocket
+
+**结论：**WebSocket并不能完全取代HTTP，它只适合在特定的场景下使用
+
+**WebSocket应用场景：**
+
+1). 视频弹幕
+
+2). 网页聊天
+
+3). 体育实况更新
+
+4). 股票基金报价实时更新 
+
+
+
+## 13. 怎么保证在同时操作多张数据库表出现程序错误时保证数据的一致性？
+
+我在涉及多表操作时使用了事务（Transaction）： 将涉及到的数据库操作封装在一个事务中。在事务中，要么所有的数据库操作都成功提交，要么全部失败回滚，保证了数据的一致性。如果发生异常，可以通过捕获异常并执行回滚操作来保证数据的一致性
+
+具体操作：
+
+​	1.在启动类上方添加@EnableTransactionManagement
+​			2.开启事务注解之后，我们只需要在需要捆绑成为一个事务的方法上添加@Transactional
+​			3.这样就把对两张表的操作捆绑成为了一个事务。
+
+
+
+## 14. 你用什么技术实现数据导出的功能的？
+
+Apache POI 是一个处理Miscrosoft Office各种文件格式的开源项目。简单来说就是，我们可以使用 POI 在 Java 程序中对Miscrosoft Office各种文件进行读写操作。
+		一般情况下，POI 都是用于操作 Excel 文件
+
+Apache POI 的应用场景：
+
+​	1.银行网银系统导出交易明细
+​			2.各种业务系统导出Excel报表
+​			3.批量导入业务数据
+
+项目中的应用：（产品原型）
+
+在数据统计页面，有一个数据导出的按钮，点击该按钮时，其实就会下载一个文件。这个文件实际上是一个Excel形式的文件，文件中主要包含最近30日运营相关的数据。表格的形式已经固定，主要由概览数据和明细数据两部分组成。真正导出这个报表之后，相对应的数字就会填充在表格中，就可以进行存档
+
+项目中的具体做法：
+
+​	1.设计Excel模板文件
+​			2.查询近30天的运营数据
+​			3.将查询到的运营数据写入模板文件
+​			4.通过输出流将Excel文件下载到客户端浏览器
+
+
+
+## 15. SpringCache（底层基于cglib动态代理技术）
+
+Spring Cache 是一个框架，实现了基于注解的缓存功能，只需要简单地加一个注解，就能实现缓存功能。
+
+Spring Cache 提供了一层抽象，底层可以切换不同的缓存实现，例如：
+
+- EHCache
+- Caffeine
+- Redis(常用)
+
+在SpringCache中提供了很多缓存操作的注解，常见的是以下的几个：
+
+| **注解**       | **说明**                                                     |
+| -------------- | ------------------------------------------------------------ |
+| @EnableCaching | 开启缓存注解功能，通常加在启动类上                           |
+| @Cacheable     | 在方法执行前先查询缓存中是否有数据，如果有数据，则直接返回缓存数据；如果没有缓存数据，调用方法并将方法返回值放到缓存中 |
+| @CachePut      | 将方法的返回值放到缓存中                                     |
+| @CacheEvict    | 将一条或多条数据从缓存中删除                                 |
+
+SpringCache 是 Spring 框架提供的一个抽象层，旨在提供一种透明的方式来缓存应用中的数据。SpringCache 不是一个具体的缓存实现，而是一个集成不同缓存解决方案的接口，如 EHCache、Caffeine、Guava、Redis 等。它允许开发者通过简单的注解来控制方法的缓存行为，例如，使用 @Cacheable 来标记一个方法的返回值应该被缓存，以及使用 @CacheEvict 来标记何时移除缓存。SpringCache 为应用提供了一致的缓存视图，而开发者不需要关心具体使用哪种缓存技术。
+		简单的说：它也是一种缓存技术，使得所用工具不局限于 Redis。相比较于使用 Redis 的时候需要把相关代码内嵌到方法体种，Spring Cache 是一种基于注解方式来达到内嵌代码相同的效果
+
+项目中的应用：
+
+​	**存在问题**：用户端小程序展示的菜品数据都是通过查询数据库获得，如果用户端访问量比较大，数据库访问压力随之增大。
+
+​	**结果**：系统响应慢、用户体验差
+
+​	**解决方法**：通过Redis来缓存菜品数据，减少数据库查询操作
+
+**缓存逻辑分析：**
+
+​	每个分类下的菜品保存一份缓存数据
+​			数据库中菜品数据有变更时清理缓存数据
+​			Spring Cache 是一个框架，实现了基于注解的缓存功能，只需要简单地加一个注解，就能实现缓存功能。Spring Cache 提供了一层抽象，底层可以切换不同的缓存实现，例如： EHCache、 Caffeine、Redis(常用)
+
+**缓存套餐**
+
+​	1.导入Spring Cache和Redis相关maven坐标
+​			2.在启动类上加入@EnableCaching注解，开启缓存注解功能
+​			3.在用户端接口SetmealController的 list 方法上加入@Cacheable注解
+​			4.在管理端接口SetmealController的 save、delete、update、startOrStop等方法上加入CacheEvict注解
+
+
+
+## 16. AOP
+
+AOP概念：AOP（Aspect-Oriented Programming，面向切面编程）是一种编程范式，旨在通过将横切关注点（cross-cutting concerns）从核心业务逻辑中分离出来，以提高代码的模块化性、可维护性和复用性
+
+AOP 的核心概念包括以下几个要素：
+
+1.切面（Aspect）： 切面是横切关注点的抽象，它包含了一组横切关注点以及在何时何处应用这些关注点的逻辑。通常，切面由一组通知（Advice）和一个切点（Pointcut）组成。
+		2.通知（Advice）： 通知是切面中具体的逻辑实现，它定义了在何时何地执行横切关注点的具体行为，包括“前置通知”（Before Advice）、“后置通知”（After Advice）、“环绕通知”（Around Advice）等。
+		3.切点（Pointcut）： 切点是在程序中指定的某个位置，通知将在这些位置执行。切点可以使用表达式或其他方式进行定义，以便匹配到程序中的特定方法或代码块。
+		4.连接点（Join Point）： 连接点是在程序执行过程中可以应用通知的具体位置，通常是方法调用、方法执行或异常抛出等。
+		5.织入（Weaving）： 织入是将切面逻辑应用到目标对象中的过程，可以在编译时、加载时或运行时进行。织入可以通过源代码修改、字节码操作、动态代理等方式实现
+
+**Spring 中的事务是如何实现的？**
+
+​	其本质是通过AOP功能，对方法前后进行拦截，在执行方法之前开启事务，在执行完目标方法之后根据执行情况提交或回滚事务
+
+**项目中如何使用的?** 
+
+​	公共字段自动填充
+
+核心是：使用aop中的环绕通知 + 切点表达式，通过环绕通知的参数获取请求方法的参数（类、方法、注解、请求方式等），获取到这些参数以后, 通过反射赋值
+
+```java
+/**
+ * 自定义切面, 实现公共字段自动填充逻辑
+ */
+@Aspect
+@Component
+@Slf4j
+public class AutoFillAspect {
+    /**
+     * 切入点
+     */
+    @Pointcut("execution(* com.sky.mapper.*.*(..)) && @annotation(com.sky.annotation.AutoFill)")
+    public void autoFillPointCut() {}
+
+    /**
+     * 前置通知
+     */
+    @Before("autoFillPointCut()")
+    public void autoFill(JoinPoint joinPoint) {
+        log.info("开始进行公共字段自动填充...");
+
+        //获取到当前被拦截的方法上的数据库操作类型
+        MethodSignature signature = (MethodSignature) joinPoint.getSignature(); // 方法签名对象
+        AutoFill autoFill = signature.getMethod().getAnnotation(AutoFill.class); // 获得方法上的注解对象
+        OperationType operationType = autoFill.value(); // 获得数据库操作类型
+
+        // 获取到当前被拦截的方法的参数--实体对象
+        Object[] args = joinPoint.getArgs();
+        if(args == null || args.length == 0) {
+            return;
+        }
+        Object entity = args[0];
+
+        // 准备赋值的数据
+        LocalDateTime now = LocalDateTime.now();
+        Long currentId = BaseContext.getCurrentId();
+
+        // 根据当前不同的数据操作类型, 为对应的属性通过反射来赋值
+        if(operationType == OperationType.INSERT) {
+            // 为4个属性赋值
+            try {
+                Method setCreateTime = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_CREATE_TIME, LocalDateTime.class);
+                Method setCreateUser = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_CREATE_USER, Long.class);
+                Method setUpdateTime = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_UPDATE_TIME, LocalDateTime.class);
+                Method setUpdateUser = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_UPDATE_USER, Long.class);
+
+                // 通过反射为对象属性赋值
+                setCreateTime.invoke(entity, now);
+                setCreateUser.invoke(entity, currentId);
+                setUpdateTime.invoke(entity, now);
+                setUpdateUser.invoke(entity, currentId);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }else if(operationType == OperationType.UPDATE) {
+            // 为2个属性赋值
+            try {
+                Method setUpdateTime = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_UPDATE_TIME, LocalDateTime.class);
+                Method setUpdateUser = entity.getClass().getDeclaredMethod(AutoFillConstant.SET_UPDATE_USER, Long.class);
+
+                setUpdateTime.invoke(entity, now);
+                setUpdateUser.invoke(entity, currentId);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+```
+
+
+
+## 17. 代理技术
+
+**代理模式：**
+
+二十三种设计模式中的一种，属于结构型模式。它的作用就是通过提供一个代理类，让我们在调用目标方法的时候，不再是直接对目标方法进行调用，而是通过代理类间接调用。让不属于目标方法核心逻辑的代码从目标方法中剥离出来——解耦。调用目标方法时先调用代理对象的方法，减少对目标方法的调用和打扰，同时让附加功能能够集中在一起也有利于统一维护
+
+**静态代理：**
+
+静态代理，主动创建代理类，将被代理的目标对象声明为成员变量，附加功能由代理类中的代理方法来实现，通过目标对象来实现核心业务逻辑。
+		静态代理确实实现了解耦，但是由于代码都写死了，完全不具备任何的灵活性。就拿日志功能来说，将来其他地方也需要附加日志，那还得再声明更多个静态代理类，那就产生了大量重复的代码，日志功能还是分散的，没有统一管理。
+		提出进一步的需求：将日志功能集中到一个代理类中，将来有任何日志需求，都通过这一个代理类来实现。这就需要使用动态代理技术了
+
+**动态代理：**
+
+动态代理技术分类：
+
+​	1.JDK动态代理：JDK原生的实现方式，需要被代理的目标类必须实现接口！他会根据目标类的接口动态生成一个代理对象！代理对象和目标对象有相同的接口
+​			2.cglib：通过继承被代理的目标类实现代理，所以不需要目标类实现接口！
+
+**代理总结：**
+
+​	1.代理方式可以解决附加功能代码干扰核心代码和不方便统一维护的问题！
+​			2.他主要是将附加功能代码提取到代理中执行，不干扰目标核心代码！
+​			3.但是我们也发现，无论使用静态代理和动态代理(jdk,cglib)，程序员的工作都比较繁琐！需要自己编写代理工厂等！
+​			4.但是，我们在实际开发中，不需要编写代理代码，我们可以使用Spring AOP框架，他会简化动态代理的实现！！！Spring AOP框架，基于AOP编程思维，封装动态代理技术，简化动态代理技术实现的框架！SpringAOP内部帮助我们实现动态代理，我们只需写少量的配置，指定生效范围即可,即可完成面向切面思维编程的实现！
+
+项目中运用:  公共字段自动填充
+
+
+
+## 18. Spring boot 全局异常处理器
+
+**什么是全局异常处理器**：
+
+​	软件开发springboot 项目过程中，不可避免的需要处理各种异常，sping mvc 架构中会出现大量的 try{...} finally{...} 代码块，不仅有大量的冗余代码，而且还影响代码的可读性。这样就需要定义个 全局统一异常处理器，以便业务层再也不必处理异常
+
+**为什么需要全局异常**
+
+​	1.不用强制写try-catch，由全局异常处理器统一捕获异常。
+​			2.自定义异常，只能用全局异常来捕获。不能直接返回给客户端，客户端是看不懂的，需要接入全局异常处理器
+​			3.JSR303规范的Validator参数校验器，参数校验不通过会抛异常，是无法使用try-catch 语句直接捕获，只能使用全局异常处理器
+
+**原理和目标：**
+
+简单的说，@ControllerAdvice 注解可以把异常处理器应用到所有控制器，而不是单个控制器。借助该注解，我们可以实现：在独立的某个地方，比如单独的一个类，定义一套对各种异常的处理机制，然后在类的签名上注解@ControllerAdvice ,统一对不同阶段的，不同异常进行处理。这就是统一异常处理的原理。
+
+对异常阶段进行分类，大致可以分为：进入Controller前的异常和Service 层异常。
+
+在我们的项目中，异常处理都是通过spring的全局异常处理器来实现的，核心是两个注解：
+
+​	一个是@RestControllerAdvice，标注在类上，可以定义全局异常处理类对异常进行拦截
+​			一个是@ExceptionHandler，标注在异常处理类中的方法上，可以声明每个方法能够处理的异常类型
+
+```java
+/**
+ * 全局异常处理器，处理项目中抛出的业务异常
+ */
+@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+
+    /**
+     * 捕获业务异常
+     * @param ex
+     * @return
+     */
+    @ExceptionHandler
+    public Result exceptionHandler(BaseException ex){
+        log.error("异常信息：{}", ex.getMessage());
+        return Result.error(ex.getMessage());
+    }
+
+    /**
+     * 处理SQL异常
+     * @param ex
+     * @return
+     */
+    @ExceptionHandler
+    public Result exceptionHandler(SQLIntegrityConstraintViolationException ex) {
+        // eg: Duplicate entry 'zhangsan' for key 'employee.idx_username'
+        String message = ex.getMessage();
+        if (message.contains("Duplicate entry")) {
+            String[] split = message.split(" ");
+            String username = split[2];
+            String msg = username + MessageConstant.ALREADY_EXISTS;
+            return Result.error(msg);
+        } else {
+            return Result.error((MessageConstant.UNKNOWN_ERROR));
+        }
+    }
+}
+```
+
+
+
+## 19. 项目是如何存储文件的
+
+在我使用过的文件存储中，主要有三类存储方式
+
+​	1.直接将文件保存到服务到硬盘，这种方式操作方便，但是扩容困难，而且安全保障不高，现在基本不再使用
+
+​	2.使用一些付费的第三方存储服务，比如阿里云或者七牛云，这种方式无需自己公司提供服务器和相关软件，并且安全性和扩展性都不需要自己再进行考虑，但是不适合存储一些敏感文件
+
+​	3.将文件保存在公司自己搭建的一些分布式系统中，比如一些公司用过MinIO和FastDFS，它需要我们自己准备服务器，安装维护软件，好处是文件都存放在自己的服务器上，隐私性比较好
+
+至于如何选择服务器，我认为目前主要考虑的就是分布式文件存储系统和第三方服务
+
+​	如果文件是隐私性比较高，建议使用自己搭建的分布式文件存储系统
+​			如果文件隐私性不高，可以考虑使用第三方服务
+我们项目中主要存储的文件是一些菜品或者套餐的图片，不涉及什么隐私问题，所以选择了阿里云服务
+
+
+
+**CommonController**
+
+```java
+/**
+ * 通用接口
+ */
+@RestController
+@RequestMapping("/admin/common")
+@Api(tags = "通用接口")
+@Slf4j
+public class CommonController {
+    @Autowired
+    private AliOssUtil aliOssUtil;
+
+    /**
+     * 文件上传
+     * @param file
+     * @return
+     */
+    @PostMapping("/upload")
+    @ApiOperation("文件上传")
+    public Result<String> upload(MultipartFile file) {
+        log.info("文件上传: {}", file);
+
+        try {
+            // 原始文件名
+            String originalFilename = file.getOriginalFilename();
+            // 截取原始文件名后缀
+            String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            // 构建新文件名称
+            String objectName = UUID.randomUUID().toString() + extension;
+
+            // 文件的请求路径
+            String filePath = aliOssUtil.upload(file.getBytes(), objectName);
+            return Result.success(filePath);
+        } catch (IOException e) {
+            log.info("文件上传失败: {}", e);
+        }
+
+        return Result.error(MessageConstant.UPLOAD_FAILED);
+    }
+}
+```
+
+
+
+**OssConfiguration**
+
+```java
+/**
+ * 配置类, 用于创建AliOssUtil对象
+ */
+@Configuration
+@Slf4j
+public class OssConfiguration {
+    @Bean
+    @ConditionalOnMissingBean
+    public AliOssUtil aliOssUtil(AliOssProperties aliOssProperties) {
+        log.info("开始创建阿里云文件上传工具类对象: {}", aliOssProperties);
+        return new AliOssUtil(aliOssProperties.getEndpoint(),
+                aliOssProperties.getAccessKeyId(),
+                aliOssProperties.getAccessKeySecret(),
+                aliOssProperties.getBucketName());
+    }
+}
+```
+
+
+
+**AliOssUtil**
+
+```java
+@Data
+@AllArgsConstructor
+@Slf4j
+public class AliOssUtil {
+
+    private String endpoint;
+    private String accessKeyId;
+    private String accessKeySecret;
+    private String bucketName;
+
+    /**
+     * 文件上传
+     *
+     * @param bytes
+     * @param objectName
+     * @return
+     */
+    public String upload(byte[] bytes, String objectName) {
+
+        // 创建OSSClient实例。
+        OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
+
+        try {
+            // 创建PutObject请求。
+            ossClient.putObject(bucketName, objectName, new ByteArrayInputStream(bytes));
+        } catch (OSSException oe) {
+            System.out.println("Caught an OSSException, which means your request made it to OSS, "
+                    + "but was rejected with an error response for some reason.");
+            System.out.println("Error Message:" + oe.getErrorMessage());
+            System.out.println("Error Code:" + oe.getErrorCode());
+            System.out.println("Request ID:" + oe.getRequestId());
+            System.out.println("Host ID:" + oe.getHostId());
+        } catch (ClientException ce) {
+            System.out.println("Caught an ClientException, which means the client encountered "
+                    + "a serious internal problem while trying to communicate with OSS, "
+                    + "such as not being able to access the network.");
+            System.out.println("Error Message:" + ce.getMessage());
+        } finally {
+            if (ossClient != null) {
+                ossClient.shutdown();
+            }
+        }
+
+        //文件访问路径规则 https://BucketName.Endpoint/ObjectName
+        StringBuilder stringBuilder = new StringBuilder("https://");
+        stringBuilder
+                .append(bucketName)
+                .append(".")
+                .append(endpoint)
+                .append("/")
+                .append(objectName);
+
+        log.info("文件上传到:{}", stringBuilder.toString());
+
+        return stringBuilder.toString();
+    }
+}
+```
+
+
+
+**AliOssProperties**
+
+```java
+@Component
+@ConfigurationProperties(prefix = "sky.alioss")
+@Data
+public class AliOssProperties {
+
+    private String endpoint;
+    private String accessKeyId;
+    private String accessKeySecret;
+    private String bucketName;
+
+}
+```
+
+
+
+**配置文件**
+
+```yml
+application.yml
+alioss:
+  endpoint: ${sky.alioss.endpoint}
+  access-key-id: ${sky.alioss.access-key-id}
+  access-key-secret: ${sky.alioss.access-key-secret}
+  bucket-name: ${sky.alioss.bucket-name}
+
+application-dev.yml
+  alioss:
+    endpoint: oss-cn-beijing.aliyuncs.com
+    access-key-id: ${OSS_ACCESS_KEY_ID}
+    access-key-secret: ${OSS_ACCESS_KEY_SECRET}
+    bucket-name: java-ai-things
+```
+
